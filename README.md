@@ -30,3 +30,5 @@ It operates like Dafny where functions are provided with pre/post and those are 
 ### KLEE
 
 Pivot to using LLVM to perform the symbolic execution.
+
+Use Cython to convert Python code to C and then call the C functions from a new Python function via C types?
