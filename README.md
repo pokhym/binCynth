@@ -26,3 +26,7 @@ https://crosshair.readthedocs.io/en/latest/index.html
 
 Not sure how to get any symbolic equation out of it, it is able to return counterexamples though.
 It operates like Dafny where functions are provided with pre/post and those are checked.
+
+### KLEE
+
+Pivot to using LLVM to perform the symbolic execution.
