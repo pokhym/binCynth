@@ -7,6 +7,8 @@ Recovering semantics of black box programs
 
 https://github.com/JonathanSalwan/Triton
 
+Must be compiled with the newest version of capstone https://github.com/aquynh/capstone found here.
+
 This allows us to symbolically analyze the binaries and print the constraint that was generated when executing the binary.
 
 For example executing this example https://github.com/JonathanSalwan/Triton/blob/master/src/examples/cpp/constraint.cpp which contins one XOR instruction we can see the following constraint returned.
