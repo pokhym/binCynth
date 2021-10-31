@@ -3,6 +3,31 @@ Recovering semantics of black box programs
 
 ## Symbolic Execution Ideas
 
+### Triton
+
+https://github.com/JonathanSalwan/Triton
+
+This allows us to symbolically analyze the binaries and print the constraint that was generated when executing the binary.
+
+For example executing this example https://github.com/JonathanSalwan/Triton/blob/master/src/examples/cpp/constraint.cpp which contins one XOR instruction we can see the following constraint returned.
+
+```
+RAX expr: (bvxor SymVar_0 (_ bv287454020 64))
+constraint: (= (bvxor SymVar_0 (_ bv287454020 64)) (_ bv0 64))
+Model:
+  - Variable id  : 0
+  - Variable name: SymVar_0
+  - Value        : 11223344
+```
+
+Therefore we should be able to obtain the semantics of the binary this way.
+
+The flow of using Triton can be as follows
+
+1. Compile a C program into a binary
+2. Use Triton to extract the constraint
+3. Build new function with these constraints using component based synthesis
+
 ### angr
 
 Angr allows one to initialize variables of specific types and then add constraints and evaluate and solve the constraint
