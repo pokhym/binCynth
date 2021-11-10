@@ -1,6 +1,6 @@
 from __future__ import print_function
-import sys
-sys.path.insert(0, "/usr/lib/python3.8/site-packages")
+# import sys
+# sys.path.insert(0, "/usr/lib/python3.8/site-packages")
 from triton import *
 
 # Initialize Triton

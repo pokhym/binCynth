@@ -1,7 +1,8 @@
 int main(){
-    int a;;
-    if(a != 0)
-        return a * a;
-    else
-        return a + 5;
+    asm (// "mov %1, %0\n\t"
+    "add $0, %rax"
+    // : "=r" () 
+    // : "r" ()
+    )
+    ;
 }

@@ -7,6 +7,7 @@ This document contains information about the import files here and things that n
 Only files of note will be listed here
 
 * `recover_semantics.py`: An example of how we can recover the semantics of one instruction
+* `equivalence_checking.py`: An example of how to check the equivalence of two assembly programs
 
 ## Things to Look into
 
