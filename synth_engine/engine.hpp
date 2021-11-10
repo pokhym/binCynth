@@ -2,6 +2,7 @@
 #define ENGINE_H
 
 #include <string>
+#include "components.hpp"
 
 class Engine {
     public:

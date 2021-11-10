@@ -3,7 +3,7 @@
 
 
 Engine::Engine(){
-    std::cout <<"A" << std::endl;    
+    std::cout <<"Initializing stuff..." << std::endl;    
 }
 
 Engine::~Engine(){
