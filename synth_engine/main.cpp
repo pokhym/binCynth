@@ -1,8 +1,13 @@
-#include <stdio.h>
+#include <iostream>
 #include "engine.hpp"
 
 int main(){
-    Engine *a = new Engine();
+    std::string path_to_binary, path_to_examples;
+    path_to_binary = "";
+    path_to_examples = "tests/example1.txt";
+    Engine *a = new Engine(path_to_binary, path_to_examples);
+    std::cout << a->path_to_examples << std::endl;
+    a->synth();
     delete a;
     return 0;
 }

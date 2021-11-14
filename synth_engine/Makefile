@@ -4,12 +4,17 @@ LDFLAGS =
 
 all: main
 
+components:
+	echo "COMPONENTS"
+	${CC} ${CFLAGS} -c components.hpp components.cpp
 
-main: engine.o
-	${CC} ${CFLAGS} engine.o main.cpp -o main
+engine: components
+	echo "ENGINE"
+	${CC} ${CFLAGS} -c engine.hpp engine.cpp
 
-engine:
-	${CC} ${CFLAGS} engine.hpp engine.cpp -o engine.o
+main: engine
+	echo "MAIN"
+	${CC} ${CFLAGS} components.o engine.o main.cpp -o main
 
 clean:
 	rm *.o main
