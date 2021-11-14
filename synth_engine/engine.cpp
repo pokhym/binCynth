@@ -9,7 +9,7 @@
 #define DEBUG 1
 #endif
 
-Engine::Engine(std::string path_to_binary, std::string path_to_examples){
+Engine::Engine(std::string path_to_binary, std::string path_to_examples, int max_instrs){
     std::cout <<"Initializing Engine stuff..." << std::endl;
     this->path_to_binary = path_to_binary;
     this->path_to_examples = path_to_examples;
@@ -18,6 +18,7 @@ Engine::Engine(std::string path_to_binary, std::string path_to_examples){
     this->in_delimiter = "in";
     this->int_delimiter = "int";
 
+    this->max_instrs = max_instrs;
 
      if (FILE *file = fopen(this->path_to_examples.c_str(), "r")) {
         fclose(file);
@@ -42,7 +43,7 @@ bool Engine::load_test_cases(){
     for( std::string line; getline( input, line ); )
     {
         
-        std::cout << line << std::endl;
+        // std::cout << line << std::endl;
 
         size_t start;
         size_t end = 0;
@@ -65,13 +66,19 @@ bool Engine::load_test_cases(){
 }
 
 void Engine::synth(){
-    std::cout << int_add(1,1) << std::endl;
+    for(int num_instr = 1 ; num_instr <= this->max_instrs ; num_instr++){
+        std::cout << (* FUNCS[0])(1, 3) << std::endl;
+    }
+}
+
+bool Engine::verify(){
+    return true;
 }
 
 void Engine::update_examples(std::vector<std::string> ex){
     std::vector<std::tuple<int, int, uint64_t>> final_ex;
 
-    for(int i = 0 ; i < ex.size() ; i += 3){
+    for(int i = 0 ; i < (int)ex.size() ; i += 3){
         int io, type;
         uint64_t val;
         if(ex[i] == this->out_delimiter.c_str())

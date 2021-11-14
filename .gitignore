@@ -1,6 +1,11 @@
 # vscode
 **/.vscode/**
 
+# ignore c stuff
+**/*.gch
+**/*.o
+**/main
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

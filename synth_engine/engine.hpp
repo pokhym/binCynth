@@ -12,6 +12,7 @@ enum Types {TYPE_INT};
 class Engine {
     public:
         /***** PUBLIC VARIABLES ******/
+        int max_instrs;
         std::string path_to_binary;
         std::string path_to_examples;
         std::string example_delimiter;
@@ -24,7 +25,7 @@ class Engine {
         /**
          * @brief Construct a new Engine object
          */
-        Engine(std::string path_to_binary, std::string path_to_examples);
+        Engine(std::string path_to_binary, std::string path_to_examples, int max_instrs);
         /**
          * @brief Destroy the Engine object
          */
