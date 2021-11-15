@@ -20,7 +20,7 @@ class SynthState{
         // "0,1,2" : [ComponentState0, ComponentState1, ComponentState2],
         // This version of a 3 function program uses components 0, 1, and 2 in that order
         // "2,1,15" : [ComponentState2, ComponentState1, ComponentState15],
-        std::string function_choice; 
+        std::vector<int> function_choice; 
         std::vector<ComponentState *> component_state;
 
         /****** FUNCTIONS *******/
