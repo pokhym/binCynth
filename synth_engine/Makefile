@@ -6,7 +6,7 @@ all: main
 
 main: engine
 	echo "MAIN"
-	${CC} ${CFLAGS} components.o engine.o main.cpp -o main
+	${CC} ${CFLAGS} components.o engine.o synth_state.o main.cpp -o main
 
 engine: components synth_state
 	echo "ENGINE"

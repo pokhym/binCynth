@@ -34,6 +34,10 @@ Engine::Engine(std::string path_to_binary, std::string path_to_examples, int max
 }
 
 Engine::~Engine(){
+    std::map<std::vector<int>, SynthState *>::iterator it;
+    for(it = this->synth_state.begin() ; it != this->synth_state.end(); it++){
+        delete it->second;
+    }
 }
 
 bool Engine::load_test_cases(){
@@ -99,9 +103,13 @@ void Engine::update_examples(std::vector<std::string> ex){
 }
 
 int Engine::choose_func(int max_num_func, int num_func_to_choose){
+    std::map<std::vector<int>, SynthState *>::iterator it = this->synth_state.begin();
     std::vector<std::vector<int>> ret;
+
     std::cout<< "MAX_NUM_FUNC " << max_num_func << " NUM_FUNC_TO_CHOOSE " << num_func_to_choose << std::endl; 
+
     ret = nCk(max_num_func, num_func_to_choose);
+    
     // for each combination
     for(std::vector<int> comb : ret){
         // print the combination
@@ -115,7 +123,18 @@ int Engine::choose_func(int max_num_func, int num_func_to_choose){
                 std::cout << ele << " ";
             std::cout << std::endl;
             // std::cout << "\t" << comb << '\n';
+            
+            // Add this instruction order to the synth_state map
+            SynthState * ss = new SynthState();
+            this->synth_state.insert(it, std::pair<std::vector<int>, SynthState *>(comb, ss));
         } while(std::next_permutation(comb.begin(), comb.end()));
+    }
+    it = this->synth_state.begin();
+    for(it = this->synth_state.begin() ; it != synth_state.end() ; it++){
+        for(int ele : it->first)
+            std::cout << ele << " ";
+        std::cout << std::endl;
+
     }
     return 0;
 }

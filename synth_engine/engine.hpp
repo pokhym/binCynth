@@ -102,7 +102,7 @@ class Engine {
         //      "2,1,15": Choose component id 2, 1, 15 in that order
         // The value represents a SynthState object for all the permutations of IO orderings between
         // these choices of compoonents and their orderings
-        std::map<std::string, SynthState *> synth_state;
+        std::map<std::vector<int>, SynthState *> synth_state;
 
         /***** PUBLIC FUNCTIONS ******/
         /**
