@@ -67,7 +67,7 @@ bool Engine::load_test_cases(){
 
 void Engine::synth(){
     for(int num_instr = 1 ; num_instr <= this->max_instrs ; num_instr++){
-        std::cout << (* FUNCS[0])(1, 3) << std::endl;
+        int comp_id = choose_func(num_instr);
     }
 }
 
@@ -94,3 +94,11 @@ void Engine::update_examples(std::vector<std::string> ex){
     }
     examples.push_back(final_ex);
 }
+
+int Engine::choose_func(int id){
+    return 0;
+}
+
+// std::vector<int> Engine::choose_arg_in(int id, int comp_id){
+//     return NULL;
+// }
