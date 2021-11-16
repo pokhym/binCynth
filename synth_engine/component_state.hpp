@@ -3,6 +3,8 @@
 
 #include <set>
 #include <tuple>
+#include <vector>
+#include "components.hpp"
 
 enum ComponentStateEnum {
     COMP_TYPE,
@@ -27,7 +29,7 @@ class ComponentState{
                                                     // Any numbers < -2 will represent the constants
                                                     // TODO: HOW TO STORE CONSTANTS
         // TODO: Currently assuming that we only have up to 2 input arguments for a function
-        std::set<std::tuple<int, int>> in_id_perm; // The permudation of input argument identifiers
+        std::set<std::vector<int>> in_id_perm; // The permudation of input argument identifiers
         int out_id; // The output argument identifier
 
         /***** FUNCTIONS *****/

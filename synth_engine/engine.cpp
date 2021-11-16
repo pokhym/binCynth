@@ -9,7 +9,7 @@
 #define DEBUG 1
 #endif
 
-Engine::Engine(std::string path_to_binary, std::string path_to_examples, int max_instrs){
+Engine::Engine(std::string path_to_binary, std::string path_to_examples, int max_instrs, int num_input_arguments){
     std::cout <<"Initializing Engine stuff..." << std::endl;
     this->path_to_binary = path_to_binary;
     this->path_to_examples = path_to_examples;
@@ -19,6 +19,7 @@ Engine::Engine(std::string path_to_binary, std::string path_to_examples, int max
     this->int_delimiter = "int";
 
     this->max_instrs = max_instrs;
+    this->num_input_arguments = num_input_arguments;
 
      if (FILE *file = fopen(this->path_to_examples.c_str(), "r")) {
         fclose(file);
@@ -125,15 +126,16 @@ int Engine::choose_func(int max_num_func, int num_func_to_choose){
             // std::cout << "\t" << comb << '\n';
             
             // Add this instruction order to the synth_state map
-            SynthState * ss = new SynthState();
+            SynthState * ss = new SynthState(comb, this->num_input_arguments);
             this->synth_state.insert(it, std::pair<std::vector<int>, SynthState *>(comb, ss));
         } while(std::next_permutation(comb.begin(), comb.end()));
     }
     it = this->synth_state.begin();
     for(it = this->synth_state.begin() ; it != synth_state.end() ; it++){
-        for(int ele : it->first)
-            std::cout << ele << " ";
-        std::cout << std::endl;
+        it->second->synth_state_dump();
+        // for(int ele : it->first)
+        //     std::cout << ele << " ";
+        // std::cout << std::endl;
 
     }
     return 0;
