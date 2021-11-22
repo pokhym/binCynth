@@ -114,12 +114,13 @@ int Engine::choose_func(int max_num_func, int num_func_to_choose){
     // for each combination
     for(std::vector<int> comb : ret){
         // print the combination
+        std::cout << "FUNC COMBINATION: ";
         for(int ele : comb)
             std::cout << ele << " ";
         std::cout << std::endl;
         // generate the permutations of ordering
         do {
-            std::cout << "\t";
+            std::cout << "\tPERMUTATION: ";
             for(int ele : comb)
                 std::cout << ele << " ";
             std::cout << std::endl;

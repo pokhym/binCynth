@@ -43,8 +43,9 @@ SynthState::SynthState(std::vector<int> function_choice, int num_input_arguments
             do {
                 // create a vector for the permutation
                 std::vector<int> perm;
-                for(auto ele : comb)
+                for(auto ele : comb){
                     perm.push_back(in_id_vec[ele]);
+                }
                 // insert the permutation
                 c->in_id_perm.insert(perm);
             } while(std::next_permutation(comb.begin(), comb.end()));
@@ -59,10 +60,23 @@ SynthState::~SynthState(){
 }
 
 void SynthState::synth_state_dump(){
-    std::cout << "SYNTH STATE FUNCTION_CHOICE:" << std::endl;
-    std::cout << "\t";
-    for(int i : this->function_choice){
-        std::cout << i << " "; 
+    std::cout << "\tSYNTH STATE FUNCTION_CHOICE:" << std::endl;
+    // std::cout << "\t\t";
+    for(int f : this->function_choice){
+        std::cout << "\t\t";
+        std::cout << "func_choice: " <<  f << std::endl;
+        for(ComponentState * cs : this->component_state){
+            if(cs->comp_type == f){
+                std::cout << "\t\tcomp_state:" << cs->comp_type << std::endl;
+                for(std::vector<int> ipv : cs->in_id_perm){
+                    std::cout << "\t\t\t";
+                    for(int ipe : ipv){
+                        std:: cout << ipe << " ";
+                    }
+                    std::cout << std::endl;
+                }
+            }
+        }
     }
     std::cout << std::endl;
 }
