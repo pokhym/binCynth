@@ -80,3 +80,108 @@ void SynthState::synth_state_dump(){
     }
     std::cout << std::endl;
 }
+
+bool SynthState::evaluate(std::vector<std::vector<std::tuple<int, int, uint64_t>>> * examples){
+    bool res = false;
+
+    this->function_choice_it = this->function_choice.begin(); // function counter iterator
+    this->function_choice_it_end = this->function_choice.end(); // function counter iterator
+    
+    // initialize empty vector of input choices
+    // std::vector<std::vector<int>> perm;
+    perm.clear();
+    // make recursive call here
+    // perm.push_back(*this->component_state[0]->in_id_perm.begin());
+    evaluate_helper(examples
+        // , this->perm 
+        ,0);
+    
+    return res;
+}
+
+bool SynthState::evaluate_helper(std::vector<std::vector<std::tuple<int, int, uint64_t>>> * examples
+                                // , std::vector<std::vector<int>> perm
+                                , int func_idx)
+{
+    // termination condition where we have reached the last function that we wish to add
+    // to our synthesized function
+    if(this->function_choice_it == this->function_choice_it_end){
+        // execute here as we now have a complete set of i/o choices
+        std::cout << "PERMS " << func_idx << ":\n";
+        for(std::vector<int> ele : this->perm){
+            std::cout << "\t";
+            for(int elee : ele){
+                std::cout << elee << " "; 
+            }
+            std::cout << std::endl;
+        }
+        std::cout << std::endl;
+        // perm.pop_back();
+        // this->function_choice_it--;
+        return true;
+    }
+    // this->function_choice_it++; // increment iterator for recursive call
+
+    // std::cout << "AAAAAAAAA " << *(this->function_choice_it) <<std::endl;
+    // choose one input permutation
+    int curr = func_idx;
+
+    std::set<std::vector<int>>::iterator curr_in_id_perm_it = this->component_state[func_idx]->in_id_perm.begin();
+    std::set<std::vector<int>>::iterator next_in_id_perm_it;
+    if(func_idx + 1 < this->function_choice.size()){
+        next_in_id_perm_it = this->component_state[func_idx + 1]->in_id_perm.begin();
+    }
+
+    while(curr_in_id_perm_it != this->component_state[func_idx]->in_id_perm.end()){
+
+        std::vector<int> a = *curr_in_id_perm_it;
+        std::cout << func_idx << " A ";
+        for(auto b : a){
+            std::cout << b << " ";
+        }
+        std::cout << std::endl;
+
+        // if(func_idx + 1 < this->function_choice.size()){
+        //     if(next_in_id_perm_it == this->component_state[func_idx + 1]->in_id_perm.end())
+        //         next_in_id_perm_it = this->component_state[func_idx + 1]->in_id_perm.begin();
+        //     std::vector<int> a = *next_in_id_perm_it;
+        //     std::cout << "B " << func_idx + 1 << "\t";
+        //     for(auto b : a){
+        //         std::cout << b << " ";
+        //     }
+        //     std::cout << std::endl;
+            
+        //     // perm.push_back(*curr_in_id_perm_it);
+        //     while(next_in_id_perm_it != this->component_state[func_idx + 1]->in_id_perm.end()){
+        //         std::vector<int> a = *next_in_id_perm_it;
+        //         std::cout << "C " << func_idx + 1 << "\t";
+        //         for(auto b : a){
+        //             std::cout << b << " ";
+        //         }
+        //         std::cout << std::endl;
+        //         // perm.push_back(*next_in_id_perm_it);
+        //         perm.push_back(*curr_in_id_perm_it);
+        //         // std::cout<< "AAAAA"<<std::endl;
+        //         this->function_choice_it++; // increment iterator for recursive call
+        //         evaluate_helper(examples
+        //             // , perm
+        //             , func_idx + 1);
+        //         this->function_choice_it--;
+        //         next_in_id_perm_it++;
+        //         perm.pop_back();
+        //     }
+        // }
+        // else{
+            perm.push_back(*curr_in_id_perm_it);
+            this->function_choice_it++; // increment iterator for recursive call
+            evaluate_helper(examples
+                // , perm
+                , func_idx + 1);
+            this->function_choice_it--;
+            perm.pop_back();
+        // }
+        curr_in_id_perm_it++;
+    }
+    // if(func_idx == 0)
+    //     perm.clear();
+}

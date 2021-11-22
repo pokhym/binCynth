@@ -35,10 +35,7 @@ Engine::Engine(std::string path_to_binary, std::string path_to_examples, int max
 }
 
 Engine::~Engine(){
-    std::map<std::vector<int>, SynthState *>::iterator it;
-    for(it = this->synth_state.begin() ; it != this->synth_state.end(); it++){
-        delete it->second;
-    }
+    clear_synth_state();
 }
 
 bool Engine::load_test_cases(){
@@ -71,16 +68,36 @@ bool Engine::load_test_cases(){
 }
 
 void Engine::synth(){
-    // declare a new SynthState
-    // for(int max_num_instr = 1 ; max_num_instr <= this->max_instrs ; max_num_instr++){
-        for(int num_instr_to_choose = 1 ; num_instr_to_choose <= this->max_instrs ; num_instr_to_choose++){
-            int comp_id = choose_func(this->max_instrs, num_instr_to_choose);
+    bool verified = false;
+    // for 1 to the maximum number of instructions
+    // consruction permutations of function combinations and inputs
+    // then verify they work for the input set of 
+    for(int num_instr_to_choose = 3 ; num_instr_to_choose <= this->max_instrs ; num_instr_to_choose++){
+        choose_func(this->max_instrs, num_instr_to_choose);
+        verified = verify();
+        if(verified){
+            std::cout << "Successfully Synthesized\n" << std::endl;
+            return;
         }
-    // }
+        clear_synth_state();
+    }
 }
 
 bool Engine::verify(){
-    return true;
+    std::cout<< "##VERIFYING##" << std::endl;
+    std::map<std::vector<int>, SynthState *>::iterator it = this->synth_state.begin();
+    it = this->synth_state.begin();
+    for(it = this->synth_state.begin() ; it != synth_state.end() ; it++){
+        it->second->synth_state_dump();
+        // for(int ele : it->first)
+        //     std::cout << ele << " ";
+        // std::cout << std::endl;
+
+        it->second->evaluate(&this->examples);
+
+    }
+    std::cout<< "##END VERIFYING##" << std::endl;
+    return false;
 }
 
 void Engine::update_examples(std::vector<std::string> ex){
@@ -103,7 +120,15 @@ void Engine::update_examples(std::vector<std::string> ex){
     examples.push_back(final_ex);
 }
 
-int Engine::choose_func(int max_num_func, int num_func_to_choose){
+void Engine::clear_synth_state(){
+    std::map<std::vector<int>, SynthState *>::iterator it;
+    for(it = this->synth_state.begin() ; it != this->synth_state.end(); it++){
+        delete it->second;
+    }
+    this->synth_state.clear();
+}
+
+void Engine::choose_func(int max_num_func, int num_func_to_choose){
     std::map<std::vector<int>, SynthState *>::iterator it = this->synth_state.begin();
     std::vector<std::vector<int>> ret;
 
@@ -131,15 +156,13 @@ int Engine::choose_func(int max_num_func, int num_func_to_choose){
             this->synth_state.insert(it, std::pair<std::vector<int>, SynthState *>(comb, ss));
         } while(std::next_permutation(comb.begin(), comb.end()));
     }
-    it = this->synth_state.begin();
-    for(it = this->synth_state.begin() ; it != synth_state.end() ; it++){
-        it->second->synth_state_dump();
-        // for(int ele : it->first)
-        //     std::cout << ele << " ";
-        // std::cout << std::endl;
-
-    }
-    return 0;
+    // it = this->synth_state.begin();
+    // for(it = this->synth_state.begin() ; it != synth_state.end() ; it++){
+    //     it->second->synth_state_dump();
+    //     // for(int ele : it->first)
+    //     //     std::cout << ele << " ";
+    //     // std::cout << std::endl;
+    // }
 }
 
 // std::vector<int> Engine::choose_arg_in(int id, int comp_id){

@@ -116,13 +116,18 @@ class Engine {
         void update_examples(std::vector<std::string> ex);
 
         /**
+         * @brief clear_synth_state : Deletes the SynthState object
+         * 
+         */
+        void clear_synth_state();
+
+        /**
          * @brief choose_func : Chooses a function to for the id-th component we wish to
          *  add to our synthesized program
          * 
          * @param num_instr : The number of components (functions) we wish to use
-         * @return int : An index into FUNC defined in components.hpp
          */
-        int choose_func(int max_num_instr, int num_instr_to_choose);
+        void choose_func(int max_num_instr, int num_instr_to_choose);
 
         /**
          * @brief choose_arg_in : Chooses the arguments for the id-th component we wish to

@@ -32,6 +32,37 @@ class SynthState{
         ~SynthState();
 
         void synth_state_dump();
+
+        /**
+         * @brief evaluate : Evaluate a sets of input output conditions and return true or false if they
+         *  match the examples input. Wraps evaluate_helper
+         * 
+         * @param examples 
+         * @return true 
+         * @return false 
+         */
+        bool evaluate(std::vector<std::vector<std::tuple<int, int, uint64_t>>> * examples);
+    
+    private:
+        // Iterators for keeping track of how far we have recursed into function choices
+        std::vector<int>::iterator function_choice_it;
+        std::vector<int>::iterator function_choice_it_end;
+
+        // permuation vector containing the current set of input output conditions we are evaluating
+        std::vector<std::vector<int>> perm;
+        
+        /**
+         * @brief evaluate_helper : A helper function that recursively enumerates all combinations of ComponentState I/O
+         *  to be executed
+         * 
+         * @param examples 
+         * @param func_idx 
+         * @return true 
+         * @return false 
+         */
+        bool evaluate_helper(std::vector<std::vector<std::tuple<int, int, uint64_t>>> * examples
+                                // , std::vector<std::vector<int>> perm
+                                , int func_idx);
 };
 
 #endif // SYNTH_STATE_H
