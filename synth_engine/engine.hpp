@@ -35,10 +35,14 @@ class Engine {
         // The word we use to mark a specific example argument as an integer
         std::string int_delimiter;
         // A vector containing each example.
-        // Each entry is a further vector with a 3 tuple
-        // Each tuple contains <InOut, Types, Value>.
-        // Outputs are stored before inputs
-        std::vector<std::vector<std::tuple<int, int, uint64_t>>> examples;
+        // Each entry is a dictionary laid out as follows.
+        //      key: integer
+        //      val: uint64_t
+        // For an input variable the key will be IO_IN - some_int
+        //      IO_IN due to the enum will be 0, we will subtract -1, -2, -3 and so on
+        // For an output variable the key will be IO_OUT
+        //      IO_OUT due to the enum will always be 1
+        std::vector<std::map<int, uint64_t> *> examples;
 
         // This stores all permutations of specific instruction orderings and their
         // corresponding IO argument combinations.
@@ -92,9 +96,10 @@ class Engine {
         /**
          * @brief verify : Verify that a synthesized function actually matches 
          *  all our input/output examples
-         * @returns bool : True if verifiation succeeds else false
+         * @returns SynthState * : This is NULL if we were unable to synthesize something that verifies
+         *  all examples.  Otherwise this will not be NULL
          */
-        bool verify();
+        SynthState * verify();
 
         /**
          * @brief debrittle : Generate a verified p_dash which is different 
@@ -106,6 +111,11 @@ class Engine {
          * @brief add_component : Add a verified component to our ground truth set
          */
         void add_component();
+
+        /**
+         * @brief dump_examples : Prints all the examples we parsed
+         */
+        void dump_exmaples();
     
     private:
         /**
@@ -125,21 +135,16 @@ class Engine {
          * @brief choose_func : Chooses a function to for the id-th component we wish to
          *  add to our synthesized program
          * 
-         * @param num_instr : The number of components (functions) we wish to use
+         * @param num_instr_to_choose : The number of components (functions) we wish to use
          */
-        void choose_func(int max_num_instr, int num_instr_to_choose);
+        void choose_func(int num_instr_to_choose);
 
         /**
-         * @brief choose_arg_in : Chooses the arguments for the id-th component we wish to
-         *  add to our synthesized program
+         * @brief dump_synthesized_function
          * 
-         * @param id : The id-th component we are choosing arguments for
-         * @return std::vector<int> : A vector of integers stating which component we wish to choose inputs from
-         *  The length of this must match the comp_id used (index into FUNC).
-         * 
-         * TODO: Add support for constants
+         * @param ss : A SynthState pointer to the SynthState that correctly verifies
          */
-        std::vector<int> choose_arg_in(int id, int comp_id);
+        void dump_synthesized_function(SynthState * ss);
 };
 
 #endif // ENGINE_H

@@ -5,9 +5,11 @@
 #include "components.hpp"
 
 
-#ifndef DEBUG
-#define DEBUG 1
+#ifndef ENGINE_DEBUG
+#define ENGINE_DEBUG 1
 #endif
+
+/*** PUBLIC ***/
 
 Engine::Engine(std::string path_to_binary, std::string path_to_examples, int max_instrs, int num_input_arguments){
     std::cout <<"Initializing Engine stuff..." << std::endl;
@@ -36,6 +38,9 @@ Engine::Engine(std::string path_to_binary, std::string path_to_examples, int max
 
 Engine::~Engine(){
     clear_synth_state();
+    for(auto m : this->examples){
+        delete m;
+    }
 }
 
 bool Engine::load_test_cases(){
@@ -68,22 +73,23 @@ bool Engine::load_test_cases(){
 }
 
 void Engine::synth(){
-    bool verified = false;
+    SynthState * ss = NULL;
     // for 1 to the maximum number of instructions
     // consruction permutations of function combinations and inputs
     // then verify they work for the input set of 
-    for(int num_instr_to_choose = 3 ; num_instr_to_choose <= this->max_instrs ; num_instr_to_choose++){
-        choose_func(this->max_instrs, num_instr_to_choose);
-        verified = verify();
-        if(verified){
+    for(int num_instr_to_choose = 2 ; num_instr_to_choose <= this->max_instrs ; num_instr_to_choose++){
+        choose_func(num_instr_to_choose);
+        ss = verify();
+        if(ss){
             std::cout << "Successfully Synthesized\n" << std::endl;
+            this->dump_synthesized_function(ss);
             return;
         }
         clear_synth_state();
     }
 }
 
-bool Engine::verify(){
+SynthState * Engine::verify(){
     std::cout<< "##VERIFYING##" << std::endl;
     std::map<std::vector<int>, SynthState *>::iterator it = this->synth_state.begin();
     it = this->synth_state.begin();
@@ -93,19 +99,46 @@ bool Engine::verify(){
         //     std::cout << ele << " ";
         // std::cout << std::endl;
 
-        it->second->evaluate(&this->examples);
+        if(it->second->evaluate(&this->examples)){
+            std::cout<< "##END VERIFYING##" << std::endl;
+            return it->second;
+        }
 
     }
     std::cout<< "##END VERIFYING##" << std::endl;
-    return false;
+    return NULL;
 }
 
-void Engine::update_examples(std::vector<std::string> ex){
-    std::vector<std::tuple<int, int, uint64_t>> final_ex;
+void Engine::dump_exmaples(){
+    std::cout << "##DUMPING EXAMPLES##" << std::endl;
+    for(std::map<int, uint64_t> * m : this->examples){
+        std::map<int, uint64_t>::iterator it;
+        for (it = m->begin(); it != m->end(); it++) {
+            std::cout << "\t" << it->first << ':' << it->second;
+        }
+        std::cout << std::endl;
+    }
+    std::cout << "##END DUMPING EXAMPLES##" << std::endl;
+}
 
+
+/*** PRIVATE ***/
+
+void Engine::update_examples(std::vector<std::string> ex){
+    // std::vector<std::tuple<int, int, uint64_t>> final_ex;
+    std::map<int, uint64_t> * final_ex = new std::map<int, uint64_t>();
+
+    // use a counter to represent the x-th input argument
+    // use the x86 calling convention
+    // call(1,2,3)
+    // push 3 ; -3 off the stack
+    // push 2 ; -2 off the stack
+    // push 1 ; -1 off the stack
+    int offset = -1;
     for(int i = 0 ; i < (int)ex.size() ; i += 3){
         int io, type;
         uint64_t val;
+        // determine type
         if(ex[i] == this->out_delimiter.c_str())
             io = IO_OUT;
         else
@@ -114,8 +147,17 @@ void Engine::update_examples(std::vector<std::string> ex){
             type = TYPE_INT;
             val = (uint64_t)std::stoi(ex[i + 2].c_str());
         }
-        std::tuple<int, int, uint64_t> tpl = std::make_tuple(io, type, val);
-        final_ex.push_back(tpl);
+        // perform insert
+        if(io == IO_IN){
+            final_ex->insert({IO_IN + offset, val});
+            offset--;
+        }
+        // IO_OUT
+        else{
+            final_ex->insert({IO_OUT, val});
+        }
+        // std::tuple<int, int, uint64_t> tpl = std::make_tuple(io, type, val);
+        // final_ex.push_back(tpl);
     }
     examples.push_back(final_ex);
 }
@@ -128,13 +170,13 @@ void Engine::clear_synth_state(){
     this->synth_state.clear();
 }
 
-void Engine::choose_func(int max_num_func, int num_func_to_choose){
+void Engine::choose_func(int num_func_to_choose){
     std::map<std::vector<int>, SynthState *>::iterator it = this->synth_state.begin();
     std::vector<std::vector<int>> ret;
 
-    std::cout<< "MAX_NUM_FUNC " << max_num_func << " NUM_FUNC_TO_CHOOSE " << num_func_to_choose << std::endl; 
+    std::cout<< "FUNCS_NUM " << FUNCS_NUM << " NUM_FUNC_TO_CHOOSE " << num_func_to_choose << std::endl; 
 
-    ret = nCk(max_num_func, num_func_to_choose);
+    ret = nCk(FUNCS_NUM, num_func_to_choose);
     
     // for each combination
     for(std::vector<int> comb : ret){
@@ -165,6 +207,9 @@ void Engine::choose_func(int max_num_func, int num_func_to_choose){
     // }
 }
 
-// std::vector<int> Engine::choose_arg_in(int id, int comp_id){
-//     return NULL;
-// }
+void Engine::dump_synthesized_function(SynthState * ss){
+    std::string synth_c = ss->get_synthesized_function();
+
+    std::cout << "Synthesized C Code" << std::endl;
+    std::cout << synth_c << std::endl;
+}

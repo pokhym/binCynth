@@ -1,13 +1,19 @@
 #include "synth_state.hpp"
 
+#define SYNTH_STATE_DEBUG 1
+// #undef SYNTH_STATE_DEBUG
+
+/*** PUBLIC ***/
+
 SynthState::SynthState(std::vector<int> function_choice, int num_input_arguments){
     this->function_choice = function_choice;
     this->num_input_arguments = num_input_arguments;
+    this->synthesized = false;
     
     bool first = true;
-    int max_input_args = 0;
+    
     // assign len(function_choice) components into component_state
-    for(int idx = 0 ; idx < (this->function_choice).size() ; idx++){
+    for(int idx = 0 ; idx < (int)(this->function_choice).size() ; idx++){
         ComponentState * cs = new ComponentState();
         this->component_state.push_back(cs);
         cs->comp_type = this->function_choice[idx];
@@ -81,8 +87,7 @@ void SynthState::synth_state_dump(){
     std::cout << std::endl;
 }
 
-bool SynthState::evaluate(std::vector<std::vector<std::tuple<int, int, uint64_t>>> * examples){
-    bool res = false;
+bool SynthState::evaluate(std::vector<std::map<int, uint64_t> *> * examples){
 
     this->function_choice_it = this->function_choice.begin(); // function counter iterator
     this->function_choice_it_end = this->function_choice.end(); // function counter iterator
@@ -94,19 +99,70 @@ bool SynthState::evaluate(std::vector<std::vector<std::tuple<int, int, uint64_t>
     // perm.push_back(*this->component_state[0]->in_id_perm.begin());
     evaluate_helper(examples
         // , this->perm 
-        ,0);
+        , 0);
     
-    return res;
+    return this->synthesized;
 }
 
-bool SynthState::evaluate_helper(std::vector<std::vector<std::tuple<int, int, uint64_t>>> * examples
+std::string SynthState::get_synthesized_function(){
+    std::string synth_c;
+    synth_c += "int synthed(";
+    for(int i = this->num_input_arguments ; i > 0 ; i--){
+        if(i == 1){
+            synth_c += "int in_" + std::to_string(i) + "){\n";
+        }
+        else{
+            synth_c += "int in_" + std::to_string(i) + ","; 
+        }
+    }
+
+    std::cout << "Functions Used:" << std::endl;
+    for(int idx = 0 ; idx < (int)this->function_choice.size() ; idx++){
+        std::cout << "\t" << FUNC_NAMES[this->function_choice[idx]] << std::endl;
+
+        synth_c += "\tint out_" + std::to_string(idx) + " = " + FUNC_NAMES[this->function_choice[idx]] + "(";
+        
+        std::cout << "\t\t" << "With Arguments: ";
+        // std::cout << "\t\t" << std::endl;
+        for(int args_idx = 0 ; args_idx < this->perm[idx].size() ; args_idx++){
+            if(args_idx == this->perm[idx].size() - 1){
+                if(this->perm[idx][args_idx] < 0)
+                    synth_c += "in_" + std::to_string(-1 * this->perm[idx][args_idx]) + ");\n";
+                else
+                    synth_c += "out_" + std::to_string(this->perm[idx][args_idx]) + ");\n";
+            }
+            else{
+                if(this->perm[idx][args_idx] < 0){
+                    synth_c += "in_" + std::to_string(-1 * this->perm[idx][args_idx]) + ", ";    
+                }
+                else{
+                    synth_c += "out_" + std::to_string(this->perm[idx][args_idx]) + ", ";
+                }
+            }
+            std::cout << this->perm[idx][args_idx] << " ";
+        }
+        std::cout << std::endl;
+    }
+    synth_c += "\treturn out_" + std::to_string(this->function_choice.size() - 1) + ";\n}";
+    
+    return synth_c;
+}
+
+/*** PRIVATE ***/
+
+bool SynthState::evaluate_helper(std::vector<std::map<int, uint64_t> *> * examples
                                 // , std::vector<std::vector<int>> perm
                                 , int func_idx)
 {
+    // if we have successfully synthesized quit
+    if(this->synthesized)
+        return this->synthesized;
+
     // termination condition where we have reached the last function that we wish to add
     // to our synthesized function
     if(this->function_choice_it == this->function_choice_it_end){
         // execute here as we now have a complete set of i/o choices
+#ifdef SYNTH_STATE_DEBUG
         std::cout << "PERMS " << func_idx << ":\n";
         for(std::vector<int> ele : this->perm){
             std::cout << "\t";
@@ -116,72 +172,137 @@ bool SynthState::evaluate_helper(std::vector<std::vector<std::tuple<int, int, ui
             std::cout << std::endl;
         }
         std::cout << std::endl;
-        // perm.pop_back();
-        // this->function_choice_it--;
-        return true;
-    }
-    // this->function_choice_it++; // increment iterator for recursive call
+#endif
 
-    // std::cout << "AAAAAAAAA " << *(this->function_choice_it) <<std::endl;
-    // choose one input permutation
-    int curr = func_idx;
+        // perform execution
+        this->synthesized = execute(examples);
+
+        return this->synthesized;
+    }
 
     std::set<std::vector<int>>::iterator curr_in_id_perm_it = this->component_state[func_idx]->in_id_perm.begin();
     std::set<std::vector<int>>::iterator next_in_id_perm_it;
-    if(func_idx + 1 < this->function_choice.size()){
+    if(func_idx + 1 < (int)this->function_choice.size()){
         next_in_id_perm_it = this->component_state[func_idx + 1]->in_id_perm.begin();
     }
 
-    while(curr_in_id_perm_it != this->component_state[func_idx]->in_id_perm.end()){
+    while(curr_in_id_perm_it != this->component_state[func_idx]->in_id_perm.end() && this->synthesized == false){
 
+#ifdef SYNTH_STATE_DEBUG
         std::vector<int> a = *curr_in_id_perm_it;
-        std::cout << func_idx << " A ";
+        std::cout << "func_idx: " << func_idx << ", curr_in_id_perm_it: ";
         for(auto b : a){
             std::cout << b << " ";
         }
         std::cout << std::endl;
+#endif
 
-        // if(func_idx + 1 < this->function_choice.size()){
-        //     if(next_in_id_perm_it == this->component_state[func_idx + 1]->in_id_perm.end())
-        //         next_in_id_perm_it = this->component_state[func_idx + 1]->in_id_perm.begin();
-        //     std::vector<int> a = *next_in_id_perm_it;
-        //     std::cout << "B " << func_idx + 1 << "\t";
-        //     for(auto b : a){
-        //         std::cout << b << " ";
-        //     }
-        //     std::cout << std::endl;
-            
-        //     // perm.push_back(*curr_in_id_perm_it);
-        //     while(next_in_id_perm_it != this->component_state[func_idx + 1]->in_id_perm.end()){
-        //         std::vector<int> a = *next_in_id_perm_it;
-        //         std::cout << "C " << func_idx + 1 << "\t";
-        //         for(auto b : a){
-        //             std::cout << b << " ";
-        //         }
-        //         std::cout << std::endl;
-        //         // perm.push_back(*next_in_id_perm_it);
-        //         perm.push_back(*curr_in_id_perm_it);
-        //         // std::cout<< "AAAAA"<<std::endl;
-        //         this->function_choice_it++; // increment iterator for recursive call
-        //         evaluate_helper(examples
-        //             // , perm
-        //             , func_idx + 1);
-        //         this->function_choice_it--;
-        //         next_in_id_perm_it++;
-        //         perm.pop_back();
-        //     }
-        // }
-        // else{
-            perm.push_back(*curr_in_id_perm_it);
-            this->function_choice_it++; // increment iterator for recursive call
-            evaluate_helper(examples
-                // , perm
-                , func_idx + 1);
-            this->function_choice_it--;
-            perm.pop_back();
-        // }
+        perm.push_back(*curr_in_id_perm_it);
+        this->function_choice_it++; // increment iterator for recursive call
+        evaluate_helper(examples
+            // , perm
+            , func_idx + 1);
+        if(this->synthesized)
+            return this->synthesized;
+        this->function_choice_it--;
+        perm.pop_back();
+
         curr_in_id_perm_it++;
     }
-    // if(func_idx == 0)
-    //     perm.clear();
+    return this->synthesized;
+}
+
+bool SynthState::execute(std::vector<std::map<int, uint64_t> *> * examples){
+    // double check we can actually execute first
+    for(int func_idx = 0; func_idx < (int)this->function_choice.size() ; func_idx++){
+        // check the number of input arguments matches
+        if((int)this->perm[func_idx].size() != FUNCS_NUM_IARGS[func_idx]){
+            return false; // terminate if not true
+        }
+    }
+
+    // create dict for storing the execution results
+    std::map<int, uint64_t> * io = new std::map<int, uint64_t>();
+    // create uint64_t for storing output value
+    uint64_t out;
+    // create a var for func choice size
+    int num_funcs = this->function_choice.size();
+    for(std::map<int, uint64_t> * m : *examples){
+        out = this->create_io(m, io);
+
+#ifdef SYNTH_STATE_DEBUG
+        std::cout << "Out: " << out << std::endl;
+        std::cout << "In :";
+        for(auto asdf = io->begin() ; asdf != io->end() ; asdf ++){
+            std::cout << asdf->first << ":" << asdf->second << " ";
+        }
+        std::cout << std::endl;
+#endif
+
+        // loop through function choice and update the io dict as we go
+        for(int func_idx = 0 ; func_idx < num_funcs ; func_idx++){
+            switch(this->perm[func_idx].size()){
+                case 1:{
+                    std::cout << "ERROR: Unimplemented function input size of 1" << std::endl;
+                    delete io;
+                    return false;
+                    break;
+                }
+                case 2:{
+                    // initialize a return variable
+                    uint64_t ret = 0;
+                    // execute the component
+                    ret = FUNCS[this->function_choice[func_idx]](io->at(this->perm[func_idx][0]), io->at(this->perm[func_idx][1]));
+#ifdef SYNTH_STATE_DEBUG
+                    std::cout << "Executing func: " << this->function_choice[func_idx] << " " << FUNC_NAMES[this->function_choice[func_idx]] << ", args: "<< io->at(this->perm[func_idx][0]) << " " << io->at(this->perm[func_idx][1]) << ", Return value: " << ret << std::endl;
+#endif
+                    // update the io
+                    io->insert({func_idx, ret});
+                    break;
+                }
+                default:{
+                    std::cout << "ERROR: Invalid function input size" << std::endl;
+                    delete io;
+                    return false;
+                    break;
+                }
+            }
+        }
+#ifdef SYNTH_STATE_DEBUG
+        // dump the result map
+        std::cout << "Dumping Result map" << std::endl;
+        for(auto it = io->begin() ; it != io->end() ; it++){
+            std::cout << "\t" << it->first << " " << it->second << std::endl;
+        }
+#endif
+        // not all io examples matched
+        if(io->at(num_funcs - 1) != out){
+            delete io;
+            return false;
+        }
+    }
+
+#ifdef SYNTH_STATE_DEBUG
+    std::cout << "SYNTH_STATE: Found winning synthesized function" << std::endl;
+#endif
+
+    delete io;
+    return true;
+}
+
+uint64_t SynthState::create_io(std::map<int, uint64_t> * example, std::map<int, uint64_t> * ret){
+    uint64_t out = 0;
+    // clear return dictionary first as we will use it multiple times
+    ret->clear();
+    std::map<int, uint64_t>::iterator it;
+    for (it = example->begin(); it != example->end(); it++) {
+        // input
+        if(it->first < 0){
+            ret->insert({it->first, it->second});
+        }
+        else{
+            out = it->second;
+        }
+    }
+    return out;
 }
