@@ -57,7 +57,7 @@ class Engine {
         /**
          * @brief Construct a new Engine object
          */
-        Engine(std::string path_to_binary, std::string path_to_examples, int max_instrs, int num_input_arguments);
+        Engine(std::string path_to_binary, std::string path_to_examples, int max_instrs);
         /**
          * @brief Destroy the Engine object
          */

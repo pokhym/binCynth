@@ -11,7 +11,7 @@
 
 /*** PUBLIC ***/
 
-Engine::Engine(std::string path_to_binary, std::string path_to_examples, int max_instrs, int num_input_arguments){
+Engine::Engine(std::string path_to_binary, std::string path_to_examples, int max_instrs){
     std::cout <<"Initializing Engine stuff..." << std::endl;
     this->path_to_binary = path_to_binary;
     this->path_to_examples = path_to_examples;
@@ -21,7 +21,7 @@ Engine::Engine(std::string path_to_binary, std::string path_to_examples, int max
     this->int_delimiter = "int";
 
     this->max_instrs = max_instrs;
-    this->num_input_arguments = num_input_arguments;
+    this->num_input_arguments = -1;
 
      if (FILE *file = fopen(this->path_to_examples.c_str(), "r")) {
         fclose(file);
@@ -78,6 +78,7 @@ void Engine::synth(){
     // consruction permutations of function combinations and inputs
     // then verify they work for the input set of 
     for(int num_instr_to_choose = 2 ; num_instr_to_choose <= this->max_instrs ; num_instr_to_choose++){
+        std::cout << "Synthesizing programs of size " << num_instr_to_choose << std::endl;
         choose_func(num_instr_to_choose);
         ss = verify();
         if(ss){
@@ -128,6 +129,9 @@ void Engine::update_examples(std::vector<std::string> ex){
     // std::vector<std::tuple<int, int, uint64_t>> final_ex;
     std::map<int, uint64_t> * final_ex = new std::map<int, uint64_t>();
 
+    // store the number of input arguments here
+    int num_iargs = 0;
+
     // use a counter to represent the x-th input argument
     // use the x86 calling convention
     // call(1,2,3)
@@ -151,6 +155,7 @@ void Engine::update_examples(std::vector<std::string> ex){
         if(io == IO_IN){
             final_ex->insert({IO_IN + offset, val});
             offset--;
+            num_iargs++;
         }
         // IO_OUT
         else{
@@ -158,6 +163,15 @@ void Engine::update_examples(std::vector<std::string> ex){
         }
         // std::tuple<int, int, uint64_t> tpl = std::make_tuple(io, type, val);
         // final_ex.push_back(tpl);
+    }
+    // initialized to negative so if this is negative assign
+    if(this->num_input_arguments < 0){
+        this->num_input_arguments = num_iargs;
+    }
+    // fail out when we detect an inconsistent number of input arguments
+    else if(this->num_input_arguments != num_iargs){
+        std::cout << "ENGINE: example number of input arguments is not consistent" << std::endl;
+        exit(-1);
     }
     examples.push_back(final_ex);
 }

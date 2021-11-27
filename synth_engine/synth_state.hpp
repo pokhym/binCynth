@@ -4,6 +4,7 @@
 #include <iostream>
 #include <map>
 #include <vector>
+#include <cmath>
 #include "component_state.hpp"
 #include "util.cpp"
 #include "components.hpp"
@@ -32,6 +33,8 @@ class SynthState{
         //  function_choice[0] = 2
         //  component_state[0] = ComponentState for FUNC[2]
         std::vector<ComponentState *> component_state;
+        // store a map containig a mapping between const_id and a ComponentState pointer
+        std::map<int, uint64_t> const_to_cs;
 
         /****** FUNCTIONS *******/
         SynthState(std::vector<int> function_choice, int num_input_arguments);

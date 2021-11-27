@@ -1,7 +1,7 @@
 #include "synth_state.hpp"
 
 #define SYNTH_STATE_DEBUG 1
-// #undef SYNTH_STATE_DEBUG
+#undef SYNTH_STATE_DEBUG
 
 /*** PUBLIC ***/
 
@@ -17,6 +17,7 @@ SynthState::SynthState(std::vector<int> function_choice, int num_input_arguments
         ComponentState * cs = new ComponentState();
         this->component_state.push_back(cs);
         cs->comp_type = this->function_choice[idx];
+        cs->func_choice_id = idx;
         cs->n_iargs = FUNCS_NUM_IARGS[this->function_choice[idx]];
         cs->n_oargs = FUNCS_NUM_OARGS[this->function_choice[idx]];
         
@@ -24,6 +25,14 @@ SynthState::SynthState(std::vector<int> function_choice, int num_input_arguments
         // determine the maximum number of input arguments to this function
         for(int i = 0 ; i < this->num_input_arguments ; i++)
             cs->in_id.insert(-1 * (i + 1));
+        // also add constant variable numbers
+        // check components.hpp for an explanation for how the constant identifier calculation works
+        for(int offset = 0 ; offset < 2 * pow(2, CONST_MAX_BIT) ; offset++){
+            int const_id = cs->create_constant_iarg(offset);
+            this->const_to_cs.insert({const_id, cs->const_map[const_id]});
+            cs->in_id.insert(const_id);
+        }
+
         // First function will not have any other possible input arguments
         if(first){
             first = false;
@@ -106,6 +115,8 @@ bool SynthState::evaluate(std::vector<std::map<int, uint64_t> *> * examples){
 
 std::string SynthState::get_synthesized_function(){
     std::string synth_c;
+    synth_c += "#include \"components.hpp\"\n\n";
+    
     synth_c += "int synthed(";
     for(int i = this->num_input_arguments ; i > 0 ; i--){
         if(i == 1){
@@ -126,14 +137,25 @@ std::string SynthState::get_synthesized_function(){
         // std::cout << "\t\t" << std::endl;
         for(int args_idx = 0 ; args_idx < this->perm[idx].size() ; args_idx++){
             if(args_idx == this->perm[idx].size() - 1){
-                if(this->perm[idx][args_idx] < 0)
-                    synth_c += "in_" + std::to_string(-1 * this->perm[idx][args_idx]) + ");\n";
+                if(this->perm[idx][args_idx] < 0){
+                    if(this->const_to_cs.count(this->perm[idx][args_idx]) != 0){
+                        // TODO: THIS IS CURRENTLY ONLY INTEGERS
+                        synth_c += std::to_string((int)this->const_to_cs[this->perm[idx][args_idx]]) + ");\n";
+                    }
+                    else
+                        synth_c += "in_" + std::to_string(-1 * this->perm[idx][args_idx]) + ");\n";
+                }
                 else
                     synth_c += "out_" + std::to_string(this->perm[idx][args_idx]) + ");\n";
             }
             else{
                 if(this->perm[idx][args_idx] < 0){
-                    synth_c += "in_" + std::to_string(-1 * this->perm[idx][args_idx]) + ", ";    
+                    if(this->const_to_cs.count(this->perm[idx][args_idx]) != 0){
+                        // TODO: THIS IS CURRENTLY ONLY INTEGERS
+                        synth_c += std::to_string((int)this->const_to_cs[this->perm[idx][args_idx]]) + ", ";
+                    }
+                    else
+                        synth_c += "in_" + std::to_string(-1 * this->perm[idx][args_idx]) + ", ";    
                 }
                 else{
                     synth_c += "out_" + std::to_string(this->perm[idx][args_idx]) + ", ";
@@ -303,6 +325,12 @@ uint64_t SynthState::create_io(std::map<int, uint64_t> * example, std::map<int, 
         else{
             out = it->second;
         }
+    }
+    // TODO: FIX THIS IS VERY SLOW
+    // additionally add all constants 
+    std::map<int, uint64_t>::iterator const_it;
+    for(const_it = this->const_to_cs.begin() ; const_it != this->const_to_cs.end() ; const_it++){
+        ret->insert({const_it->first, const_it->second});
     }
     return out;
 }
