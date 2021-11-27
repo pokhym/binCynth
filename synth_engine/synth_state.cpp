@@ -9,6 +9,11 @@ SynthState::SynthState(std::vector<int> function_choice, int num_input_arguments
     this->function_choice = function_choice;
     this->num_input_arguments = num_input_arguments;
     this->synthesized = false;
+    this->num_constants = 0;
+    this->max_constants = 0;
+
+    this->const_id_to_cs.clear();
+    this->const_num_to_cs.clear();
     
     bool first = true;
     
@@ -25,13 +30,6 @@ SynthState::SynthState(std::vector<int> function_choice, int num_input_arguments
         // determine the maximum number of input arguments to this function
         for(int i = 0 ; i < this->num_input_arguments ; i++)
             cs->in_id.insert(-1 * (i + 1));
-        // also add constant variable numbers
-        // check components.hpp for an explanation for how the constant identifier calculation works
-        for(int offset = 0 ; offset < 2 * pow(2, CONST_MAX_BIT) ; offset++){
-            int const_id = cs->create_constant_iarg(offset);
-            this->const_to_cs.insert({const_id, cs->const_map[const_id]});
-            cs->in_id.insert(const_id);
-        }
 
         // First function will not have any other possible input arguments
         if(first){
@@ -47,31 +45,141 @@ SynthState::SynthState(std::vector<int> function_choice, int num_input_arguments
         cs->out_id = idx;
     }
 
-    // generate the permuations of input arguments for each component
-    for(ComponentState * c : this->component_state){
-        std::vector<std::vector<int>> ret;
-        std::vector<int> in_id_vec(c->in_id.begin(), c->in_id.end());
-        // get combinations
-        ret = nCk(c->in_id.size(), c->n_iargs);
-        // generate permutations
-        for(std::vector<int> comb : ret){
-            do {
-                // create a vector for the permutation
-                std::vector<int> perm;
-                for(auto ele : comb){
-                    perm.push_back(in_id_vec[ele]);
-                }
-                // insert the permutation
-                c->in_id_perm.insert(perm);
-            } while(std::next_permutation(comb.begin(), comb.end()));
-        } 
+    // // generate the permuations of input arguments for each component
+    // for(ComponentState * c : this->component_state){
+    //     std::vector<std::vector<int>> ret;
+    //     std::vector<int> in_id_vec(c->in_id.begin(), c->in_id.end());
+    //     // get combinations
+    //     ret = nCk(c->in_id.size(), c->n_iargs);
+    //     // generate permutations
+    //     for(std::vector<int> comb : ret){
+    //         do {
+    //             // create a vector for the permutation
+    //             std::vector<int> perm;
+    //             for(auto ele : comb){
+    //                 perm.push_back(in_id_vec[ele]);
+    //             }
+    //             // insert the permutation
+    //             c->in_id_perm.insert(perm);
+    //         } while(std::next_permutation(comb.begin(), comb.end()));
+    //     } 
+    // }
+
+    // update the maximum number of constants
+    for(int idx = 0 ; idx < (int)(this->function_choice).size() ; idx++){
+        this->max_constants += this->component_state[idx]->n_iargs;
+        for(int i = 0 ; i < this->component_state[idx]->n_iargs ; i++)
+            this->const_num_to_cs.insert({i, this->component_state[idx]});
+        // determine if we need to add any constants by default
+        if(this->component_state[idx]->n_iargs > this->num_input_arguments){
+            if(this->component_state[idx]->n_iargs - this->num_input_arguments > this->num_constants)
+                this->num_constants = this->component_state[idx]->n_iargs - this->num_input_arguments;
+        }
     }
+    
+    this->update_constants(false);
+    // // attempt to use 0 constants first
+    // if(!this->update_constants(false)){
+    //     // otherwise incrementally add constants
+    //     while(this->num_constants < this->max_constants){
+    //         if(this->update_constants(true))
+    //             break;
+    //     }   
+    // }
 
 }
 
 SynthState::~SynthState(){
     for(auto cs : this->component_state)
         delete cs;
+}
+
+bool SynthState::update_constants(bool increment_constant_count){
+    if(increment_constant_count)
+        this->num_constants++;
+    
+    // default case if there aree 0 constants
+    if(this->num_constants == 0){
+        // generate the permuations of input arguments for each component
+        for(ComponentState * c : this->component_state){
+            std::vector<std::vector<int>> ret;
+            std::vector<int> in_id_vec(c->in_id.begin(), c->in_id.end());
+            // get combinations
+            ret = nCk(c->in_id.size(), c->n_iargs);
+            // generate permutations
+            for(std::vector<int> comb : ret){
+                do {
+                    // create a vector for the permutation
+                    std::vector<int> perm;
+                    for(auto ele : comb){
+                        perm.push_back(in_id_vec[ele]);
+                    }
+                    // insert the permutation
+                    c->in_id_perm.insert(perm);
+                } while(std::next_permutation(comb.begin(), comb.end()));
+            } 
+        }
+        return true;
+    }
+
+    std::vector<std::vector<int>> constant_combs = nCk(this->max_constants, this->num_constants);
+    std::cout << "constant_combs " << constant_combs.size() << std::endl;
+    for(ComponentState * c : this->component_state){
+        c->in_id_perm.clear();
+        c->in_id.clear();
+    }
+
+    // regenerate the permuations of input arguments for each component
+    // for each combination of constants
+    for(std::vector<int> const_comb : constant_combs){
+        for(ComponentState * c : this->component_state){
+            // clear the in_id_perm/in_id first
+            // c->in_id_perm.clear();
+            // c->in_id.clear();
+
+            // re-insert default in_ids
+            for(int i = 0 ; i < this->num_input_arguments ; i++)
+                c->in_id.insert(-1 * (i + 1));
+            
+            std::vector<std::vector<int>> ret;
+            std::vector<int> in_id_vec(c->in_id.begin(), c->in_id.end());
+
+            // if the const_comb contains constants for this current ComponentState
+            // add it to the in_id_vec
+            for(int cc : const_comb){
+                if(this->const_num_to_cs[cc] == c){
+                    // in_id_vec.push_back(c->c);
+                    std::cout << "cc " << cc << std::endl;
+                    for(int offset = 0 ; offset < 2 * pow(2, CONST_MAX_BIT) ; offset++){
+                        int const_id = c->create_constant_iarg(offset);
+                        this->const_id_to_cs.insert({const_id, c->const_map[const_id]});
+                        c->in_id.insert(const_id);
+                        in_id_vec.push_back(const_id);
+                    }
+                }
+            }
+
+            // get combinations
+            ret = nCk(c->in_id.size(), c->n_iargs);
+            // generate permutations
+            for(std::vector<int> comb : ret){
+                do {
+                    // create a vector for the permutation
+                    std::vector<int> perm;
+                    for(auto ele : comb){
+                        // if(ele >= in_id_vec.size()){
+                        //     std::cout << "AAAAAAAAA" << std::endl;
+                        //     return false;
+                        // }
+                        perm.push_back(in_id_vec[ele]);
+                    }
+                    // insert the permutation
+                    c->in_id_perm.insert(perm);
+                } while(std::next_permutation(comb.begin(), comb.end()));
+            } 
+        }
+    }
+    return true;
 }
 
 void SynthState::synth_state_dump(){
@@ -116,7 +224,7 @@ bool SynthState::evaluate(std::vector<std::map<int, uint64_t> *> * examples){
 std::string SynthState::get_synthesized_function(){
     std::string synth_c;
     synth_c += "#include \"components.hpp\"\n\n";
-    
+
     synth_c += "int synthed(";
     for(int i = this->num_input_arguments ; i > 0 ; i--){
         if(i == 1){
@@ -138,9 +246,9 @@ std::string SynthState::get_synthesized_function(){
         for(int args_idx = 0 ; args_idx < this->perm[idx].size() ; args_idx++){
             if(args_idx == this->perm[idx].size() - 1){
                 if(this->perm[idx][args_idx] < 0){
-                    if(this->const_to_cs.count(this->perm[idx][args_idx]) != 0){
+                    if(this->const_id_to_cs.count(this->perm[idx][args_idx]) != 0){
                         // TODO: THIS IS CURRENTLY ONLY INTEGERS
-                        synth_c += std::to_string((int)this->const_to_cs[this->perm[idx][args_idx]]) + ");\n";
+                        synth_c += std::to_string((int)this->const_id_to_cs[this->perm[idx][args_idx]]) + ");\n";
                     }
                     else
                         synth_c += "in_" + std::to_string(-1 * this->perm[idx][args_idx]) + ");\n";
@@ -150,9 +258,9 @@ std::string SynthState::get_synthesized_function(){
             }
             else{
                 if(this->perm[idx][args_idx] < 0){
-                    if(this->const_to_cs.count(this->perm[idx][args_idx]) != 0){
+                    if(this->const_id_to_cs.count(this->perm[idx][args_idx]) != 0){
                         // TODO: THIS IS CURRENTLY ONLY INTEGERS
-                        synth_c += std::to_string((int)this->const_to_cs[this->perm[idx][args_idx]]) + ", ";
+                        synth_c += std::to_string((int)this->const_id_to_cs[this->perm[idx][args_idx]]) + ", ";
                     }
                     else
                         synth_c += "in_" + std::to_string(-1 * this->perm[idx][args_idx]) + ", ";    
@@ -329,7 +437,7 @@ uint64_t SynthState::create_io(std::map<int, uint64_t> * example, std::map<int, 
     // TODO: FIX THIS IS VERY SLOW
     // additionally add all constants 
     std::map<int, uint64_t>::iterator const_it;
-    for(const_it = this->const_to_cs.begin() ; const_it != this->const_to_cs.end() ; const_it++){
+    for(const_it = this->const_id_to_cs.begin() ; const_it != this->const_id_to_cs.end() ; const_it++){
         ret->insert({const_it->first, const_it->second});
     }
     return out;

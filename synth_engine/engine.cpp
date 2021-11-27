@@ -77,7 +77,7 @@ void Engine::synth(){
     // for 1 to the maximum number of instructions
     // consruction permutations of function combinations and inputs
     // then verify they work for the input set of 
-    for(int num_instr_to_choose = 2 ; num_instr_to_choose <= this->max_instrs ; num_instr_to_choose++){
+    for(int num_instr_to_choose = 1 ; num_instr_to_choose <= this->max_instrs ; num_instr_to_choose++){
         std::cout << "Synthesizing programs of size " << num_instr_to_choose << std::endl;
         choose_func(num_instr_to_choose);
         ss = verify();
@@ -95,16 +95,19 @@ SynthState * Engine::verify(){
     std::map<std::vector<int>, SynthState *>::iterator it = this->synth_state.begin();
     it = this->synth_state.begin();
     for(it = this->synth_state.begin() ; it != synth_state.end() ; it++){
-        it->second->synth_state_dump();
-        // for(int ele : it->first)
-        //     std::cout << ele << " ";
-        // std::cout << std::endl;
+        for(int const_count = it->second->num_constants ; const_count < it->second->max_constants ; const_count++){
+            it->second->synth_state_dump();
+            std::cout << "Synthesizing with " << const_count << " constants for a maximum of " << it->second->max_constants << " constants" << std::endl;
+            // for(int ele : it->first)
+            //     std::cout << ele << " ";
+            // std::cout << std::endl;
 
-        if(it->second->evaluate(&this->examples)){
-            std::cout<< "##END VERIFYING##" << std::endl;
-            return it->second;
+            if(it->second->evaluate(&this->examples)){
+                std::cout<< "##END VERIFYING##" << std::endl;
+                return it->second;
+            }
+            it->second->update_constants(true);
         }
-
     }
     std::cout<< "##END VERIFYING##" << std::endl;
     return NULL;

@@ -34,11 +34,28 @@ class SynthState{
         //  component_state[0] = ComponentState for FUNC[2]
         std::vector<ComponentState *> component_state;
         // store a map containig a mapping between const_id and a ComponentState pointer
-        std::map<int, uint64_t> const_to_cs;
+        std::map<int, uint64_t> const_id_to_cs;
+
+        // the number of constants we are currently using
+        int num_constants;
+        // the maximum number of constants we wish to use
+        int max_constants;
+        // store a map containing a mapping between a const_num to a ComponentState pointer
+        // this map differs from const_id_to_cs as this value is dependent on max_constants
+        // if the first function has 2 inputs and the second has 3
+        // then
+        //  0 -> first
+        //  1 -> first
+        //  2 -> second
+        //  3 -> second
+        //  4 -> second
+        std::map<int, ComponentState *> const_num_to_cs;
 
         /****** FUNCTIONS *******/
         SynthState(std::vector<int> function_choice, int num_input_arguments);
         ~SynthState();
+
+        bool update_constants(bool increment_constant_count);
 
         void synth_state_dump();
 

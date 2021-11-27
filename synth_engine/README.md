@@ -22,5 +22,4 @@ This allows us to store our components as straight C/C++ code and combine them t
     * Synthesis engine needs support for 1 arg/3 arg/4 arg functions
     * debrittle
     * add_component
-* synth_state
-    * Supports constants but we now need to incrementally add constants
+* comments and documentation on files some of it is out of date
