@@ -23,4 +23,4 @@ This allows us to store our components as straight C/C++ code and combine them t
     * debrittle
     * add_component
 * synth_state
-    * SynthState needs to support constants
+    * Supports constants but we now need to incrementally add constants
