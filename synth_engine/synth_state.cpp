@@ -226,7 +226,7 @@ std::string SynthState::get_synthesized_function(){
     synth_c += "#include \"components.hpp\"\n\n";
 
     synth_c += "int synthed(";
-    for(int i = this->num_input_arguments ; i > 0 ; i--){
+    for(int i = 0 ; i < this->num_input_arguments ; i++){
         if(i == 1){
             synth_c += "int in_" + std::to_string(i) + "){\n";
         }
