@@ -20,6 +20,5 @@ This allows us to store our components as straight C/C++ code and combine them t
     * Convert `FUNCS` in components to be vectors so we can actually update them without actually re-executing stuff
 * engine
     * Synthesis engine needs support for 1 arg/3 arg/4 arg functions
-    * debrittle
     * add_component
 * comments and documentation on files some of it is out of date

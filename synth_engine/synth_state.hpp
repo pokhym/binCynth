@@ -20,6 +20,11 @@
 class SynthState{
     public:
         /******* VARIABLES ********/
+        // Target number of synthesized functions
+        int * target_synth_count;
+        // Current number of synthesized
+        int * current_synth_count;
+
         // The number of input arguments the program we are synthesizing will use
         int num_input_arguments;
 
@@ -51,8 +56,11 @@ class SynthState{
         //  4 -> second
         std::map<int, ComponentState *> const_num_to_cs;
 
+        // succssful permuations of inputs/outputs
+        std::vector<std::string> successful_functions;
+
         /****** FUNCTIONS *******/
-        SynthState(std::vector<int> function_choice, int num_input_arguments);
+        SynthState(std::vector<int> function_choice, int num_input_arguments, int * target_synth_count, int * current_synth_count);
         ~SynthState();
 
         bool update_constants(bool increment_constant_count);

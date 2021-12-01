@@ -18,6 +18,10 @@ enum Types {TYPE_INT};
 class Engine {
     public:
         /***** PUBLIC VARIABLES ******/
+        // Target number of synthesized functions
+        int * target_synth_count;
+        // Current number of synthesized
+        int * current_synth_count;
         // Maximum number of instructions the synthesized program may have
         int max_instrs;
         // Number of input arguments to the function we are trying to synthesize
@@ -52,6 +56,8 @@ class Engine {
         // The value represents a SynthState object for all the permutations of IO orderings between
         // these choices of compoonents and their orderings
         std::map<std::vector<int>, SynthState *> synth_state;
+
+        std::vector<std::string> synthesized_functions;
 
         /***** PUBLIC FUNCTIONS ******/
         /**
@@ -144,7 +150,7 @@ class Engine {
          * 
          * @param ss : A SynthState pointer to the SynthState that correctly verifies
          */
-        void dump_synthesized_function(SynthState * ss);
+        void dump_synthesized_function();
 };
 
 #endif // ENGINE_H

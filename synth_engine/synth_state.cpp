@@ -5,15 +5,20 @@
 
 /*** PUBLIC ***/
 
-SynthState::SynthState(std::vector<int> function_choice, int num_input_arguments){
+SynthState::SynthState(std::vector<int> function_choice, int num_input_arguments
+                        , int * target_synth_count, int * current_synth_count)
+{
     this->function_choice = function_choice;
     this->num_input_arguments = num_input_arguments;
     this->synthesized = false;
     this->num_constants = 0;
     this->max_constants = 0;
+    this->target_synth_count = target_synth_count;
+    this->current_synth_count = current_synth_count;
 
     this->const_id_to_cs.clear();
     this->const_num_to_cs.clear();
+    this->successful_functions.clear();
     
     bool first = true;
     
@@ -97,6 +102,9 @@ SynthState::~SynthState(){
 bool SynthState::update_constants(bool increment_constant_count){
     if(increment_constant_count)
         this->num_constants++;
+
+    // clear the synthesized functions as we already added them in engine
+    this->successful_functions.clear();
     
     // default case if there aree 0 constants
     if(this->num_constants == 0){
@@ -149,7 +157,7 @@ bool SynthState::update_constants(bool increment_constant_count){
             for(int cc : const_comb){
                 if(this->const_num_to_cs[cc] == c){
                     // in_id_vec.push_back(c->c);
-                    std::cout << "cc " << cc << std::endl;
+                    // std::cout << "cc " << cc << std::endl;
                     for(int offset = 0 ; offset < 2 * pow(2, CONST_MAX_BIT) ; offset++){
                         int const_id = c->create_constant_iarg(offset);
                         this->const_id_to_cs.insert({const_id, c->const_map[const_id]});
@@ -188,18 +196,18 @@ void SynthState::synth_state_dump(){
     for(int f : this->function_choice){
         std::cout << "\t\t";
         std::cout << "func_choice: " <<  f << std::endl;
-        for(ComponentState * cs : this->component_state){
-            if(cs->comp_type == f){
-                std::cout << "\t\tcomp_state:" << cs->comp_type << std::endl;
-                for(std::vector<int> ipv : cs->in_id_perm){
-                    std::cout << "\t\t\t";
-                    for(int ipe : ipv){
-                        std:: cout << ipe << " ";
-                    }
-                    std::cout << std::endl;
-                }
-            }
-        }
+        // for(ComponentState * cs : this->component_state){
+        //     if(cs->comp_type == f){
+        //         std::cout << "\t\tcomp_state:" << cs->comp_type << std::endl;
+        //         for(std::vector<int> ipv : cs->in_id_perm){
+        //             std::cout << "\t\t\t";
+        //             for(int ipe : ipv){
+        //                 std:: cout << ipe << " ";
+        //             }
+        //             std::cout << std::endl;
+        //         }
+        //     }
+        // }
     }
     std::cout << std::endl;
 }
@@ -225,9 +233,11 @@ std::string SynthState::get_synthesized_function(){
     std::string synth_c;
     synth_c += "#include \"components.hpp\"\n\n";
 
-    synth_c += "int synthed(";
+    synth_c += "int synthed_";
+    synth_c += std::to_string(*this->current_synth_count);
+    synth_c += "(";
     for(int i = 0 ; i < this->num_input_arguments ; i++){
-        if(i == 1){
+        if(i == this->num_input_arguments - 1){
             synth_c += "int in_" + std::to_string(i) + "){\n";
         }
         else{
@@ -285,8 +295,10 @@ bool SynthState::evaluate_helper(std::vector<std::map<int, uint64_t> *> * exampl
                                 , int func_idx)
 {
     // if we have successfully synthesized quit
-    if(this->synthesized)
-        return this->synthesized;
+    // if(this->synthesized)
+    //     return this->synthesized;
+    if(*this->current_synth_count >= *this->target_synth_count)
+        return true;
 
     // termination condition where we have reached the last function that we wish to add
     // to our synthesized function
@@ -305,9 +317,10 @@ bool SynthState::evaluate_helper(std::vector<std::map<int, uint64_t> *> * exampl
 #endif
 
         // perform execution
-        this->synthesized = execute(examples);
+        // this->synthesized = execute(examples);
+        execute(examples);
 
-        return this->synthesized;
+        return true;
     }
 
     std::set<std::vector<int>>::iterator curr_in_id_perm_it = this->component_state[func_idx]->in_id_perm.begin();
@@ -316,7 +329,8 @@ bool SynthState::evaluate_helper(std::vector<std::map<int, uint64_t> *> * exampl
         next_in_id_perm_it = this->component_state[func_idx + 1]->in_id_perm.begin();
     }
 
-    while(curr_in_id_perm_it != this->component_state[func_idx]->in_id_perm.end() && this->synthesized == false){
+    while(curr_in_id_perm_it != this->component_state[func_idx]->in_id_perm.end() //&& this->synthesized == false){
+             && (*this->current_synth_count < *this->target_synth_count)){
 
 #ifdef SYNTH_STATE_DEBUG
         std::vector<int> a = *curr_in_id_perm_it;
@@ -332,14 +346,16 @@ bool SynthState::evaluate_helper(std::vector<std::map<int, uint64_t> *> * exampl
         evaluate_helper(examples
             // , perm
             , func_idx + 1);
-        if(this->synthesized)
-            return this->synthesized;
+        // if(this->synthesized)
+        //     return this->synthesized;
+        if(*this->current_synth_count >= *this->target_synth_count)
+            return true;
         this->function_choice_it--;
         perm.pop_back();
 
         curr_in_id_perm_it++;
     }
-    return this->synthesized;
+    return true;
 }
 
 bool SynthState::execute(std::vector<std::map<int, uint64_t> *> * examples){
@@ -416,6 +432,11 @@ bool SynthState::execute(std::vector<std::map<int, uint64_t> *> * examples){
     std::cout << "SYNTH_STATE: Found winning synthesized function" << std::endl;
 #endif
 
+    // update the number of successfully synthesized functions
+    (*this->current_synth_count)++;
+    // add this to our successfuly permutation vector
+    this->successful_functions.push_back(this->get_synthesized_function());
+    
     delete io;
     return true;
 }

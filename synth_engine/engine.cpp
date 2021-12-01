@@ -19,6 +19,8 @@ Engine::Engine(std::string path_to_binary, std::string path_to_examples, int max
     this->out_delimiter = "out";
     this->in_delimiter = "in";
     this->int_delimiter = "int";
+    this->target_synth_count = new int(2);
+    this->current_synth_count = new int(0);
 
     this->max_instrs = max_instrs;
     this->num_input_arguments = -1;
@@ -41,6 +43,8 @@ Engine::~Engine(){
     for(auto m : this->examples){
         delete m;
     }
+    delete this->target_synth_count;
+    delete this->current_synth_count;
 }
 
 bool Engine::load_test_cases(){
@@ -74,20 +78,31 @@ bool Engine::load_test_cases(){
 
 void Engine::synth(){
     SynthState * ss = NULL;
+    // keep track of how many we have synthesized before calling verify
+    int count = 0;
     // for 1 to the maximum number of instructions
     // consruction permutations of function combinations and inputs
     // then verify they work for the input set of 
     for(int num_instr_to_choose = 1 ; num_instr_to_choose <= this->max_instrs ; num_instr_to_choose++){
         std::cout << "Synthesizing programs of size " << num_instr_to_choose << std::endl;
         choose_func(num_instr_to_choose);
-        ss = verify();
-        if(ss){
-            std::cout << "Successfully Synthesized\n" << std::endl;
-            this->dump_synthesized_function(ss);
-            return;
+        verify();
+
+        if(count < *this->current_synth_count){
+            count = *this->current_synth_count;
+            std::cout << "Successfully Synthesized " << *this->current_synth_count << "/" << *this->target_synth_count << "\n" << std::endl;
         }
+        if(*this->current_synth_count >= *this->target_synth_count)
+            break;
+
+        // if(ss){
+        //     std::cout << "Successfully Synthesized " << *this->current_synth_count << "\n" << std::endl;
+        //     this->dump_synthesized_function(ss);
+        //     return;
+        // }
         clear_synth_state();
     }
+    this->dump_synthesized_function();
 }
 
 SynthState * Engine::verify(){
@@ -102,9 +117,22 @@ SynthState * Engine::verify(){
             //     std::cout << ele << " ";
             // std::cout << std::endl;
 
-            if(it->second->evaluate(&this->examples)){
+            // if(it->second->evaluate(&this->examples)){
+            //     std::cout<< "##END VERIFYING##" << std::endl;
+            //     return it->second;
+            // }
+
+            it->second->evaluate(&this->examples);
+
+            // if there are any functions that were successfully synthesized add them
+            if(it->second->successful_functions.size() > 0){
+                for(auto f : it->second->successful_functions)
+                    this->synthesized_functions.push_back(f);
+            }
+            // return if we have matched or exceeded our target synthesized function count
+            if(*this->current_synth_count >= *this->target_synth_count){
                 std::cout<< "##END VERIFYING##" << std::endl;
-                return it->second;
+                return NULL;
             }
             it->second->update_constants(true);
         }
@@ -211,7 +239,8 @@ void Engine::choose_func(int num_func_to_choose){
             // std::cout << "\t" << comb << '\n';
             
             // Add this instruction order to the synth_state map
-            SynthState * ss = new SynthState(comb, this->num_input_arguments);
+            SynthState * ss = new SynthState(comb, this->num_input_arguments
+                                        , this->target_synth_count, this->current_synth_count);
             this->synth_state.insert(it, std::pair<std::vector<int>, SynthState *>(comb, ss));
         } while(std::next_permutation(comb.begin(), comb.end()));
     }
@@ -224,9 +253,17 @@ void Engine::choose_func(int num_func_to_choose){
     // }
 }
 
-void Engine::dump_synthesized_function(SynthState * ss){
-    std::string synth_c = ss->get_synthesized_function();
+void Engine::dump_synthesized_function(){
+    if(this->synthesized_functions.size() == 0){
+        std::cout << "Unable to synthesize any functions for current parameters." << std::endl;
+        return;
+    }
 
-    std::cout << "Synthesized C Code" << std::endl;
-    std::cout << synth_c << std::endl;
+    std::cout << "Able to synthesize the following functions." << std::endl << std::endl;
+
+    for(auto f : this->synthesized_functions){
+        std::cout << "#############" << std::endl;
+        std::cout << f << std::endl;
+        std::cout << "#############" << std::endl;
+    }
 }
