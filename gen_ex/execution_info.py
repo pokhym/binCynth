@@ -5,7 +5,7 @@ import copy
 
 # TODO: Add more
 # String identifiers for which registers are used for input arguments
-ARGUMENT_REGISTERS = {"rdi", "edi", "rsi", "esi", "rdx", "edx", "rcx", "ecx", "r8", "r9"}
+ARGUMENT_REGISTERS = ["rdi", "edi", "rsi", "esi", "rdx", "edx", "rcx", "ecx", "r8", "r9"]
 # String identifiers for which registers are used for output arguments
 OUTPUT_REGISTERS = {"rax", "eax"}
 
