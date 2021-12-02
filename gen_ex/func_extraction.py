@@ -138,7 +138,7 @@ def emulate(ctx, pc):
     return
 
 
-def loadBinary(ctx):
+def load_binary(ctx):
     import lief
 
     # Map the binary into the memory
@@ -151,6 +151,9 @@ def loadBinary(ctx):
         ctx.setConcreteMemoryAreaValue(vaddr, phdr.content)
 
     return binary
+
+def run_triton():
+    """"""
 
 
 if __name__ == '__main__':
@@ -172,7 +175,7 @@ if __name__ == '__main__':
     CTX.setConcreteRegisterValue(CTX.registers.rsp, BASE_STACK)
 
     # Load the binary
-    binary = loadBinary(CTX)
+    binary = load_binary(CTX)
 
     # set init register state in ExecutionInfo
     EXECUTION_INFO.set_init_regs(CTX)

@@ -55,7 +55,7 @@ class FunctionInfo():
     ii : List[InstructionInfo]
     call_depth : int
     # input arguments
-    i_args : Dict[int, Tuple[int, int]] # address ebp -> (size, value)
+    i_args : Dict[Tuple[int, int], Tuple[int, int]] # (address ebp, negative offset) -> (size, value)
     o_args : Dict[str, int] # reg -> value
     # TODO: unused as of now
     initial_memory : List[Tuple[int, int]]
@@ -89,10 +89,10 @@ class FunctionInfo():
                 assert(len(set(i.r_regs.keys()).intersection(ARGUMENT_REGISTERS)) == 1)
                 if i.r_regs["rbp"] - 4 in i.w_addrs.keys():
                     assert(i.r_regs["rbp"] - 4 in i.w_addrs.keys())
-                    self.i_args.update({i.r_regs["rbp"] - 4 : i.w_addrs[i.r_regs["rbp"] - 4]})
+                    self.i_args.update({(i.r_regs["rbp"], -4) : i.w_addrs[i.r_regs["rbp"] - 4]})
                 elif i.r_regs["rbp"] - 8 in i.w_addrs.keys():
                     assert(i.r_regs["rbp"] - 8 in i.w_addrs.keys())
-                    self.i_args.update({i.r_regs["rbp"] - 8 : i.w_addrs[i.r_regs["rbp"] - 8]})
+                    self.i_args.update({(i.r_regs["rbp"], -8) : i.w_addrs[i.r_regs["rbp"] - 8]})
                 else:
                     print("[FunctionInfo] determine_number_input_arguments: Different offset from RBP detected. RBP", i.r_regs["rbp"], ", written addresses", i.w_addrs)
             elif "ebp" in i.r_regs:
