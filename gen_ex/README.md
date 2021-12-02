@@ -8,7 +8,7 @@ This folder contains two different components
 These two components will allow us to break down a binary into smaller parts and allow synthesis to be tractable as we will only be operating on small sections at a time.
 
 We will use `Triton` (`https://github.com/JonathanSalwan/Triton`) as a CPU emulator to emulate the program and get the input output values.
-This is based on `unicorn` (`unicorn` (`https://github.com/unicorn-engine/unicorn/`) which in tuern is based upon QEMU.
+<!-- This is based on `unicorn` (`unicorn` (`https://github.com/unicorn-engine/unicorn/`) which in tuern is based upon QEMU. -->
 
 Additionall we also use `lief` (`https://lief-project.github.io/`) to easily process ELF binaries for Linux systems.
 

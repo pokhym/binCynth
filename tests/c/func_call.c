@@ -6,5 +6,6 @@ int modify_stuff(int a){
 }
 int main(void){
     int a = 5;
+    a++;
     return modify_stuff(a);
 }

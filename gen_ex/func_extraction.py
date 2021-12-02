@@ -43,9 +43,9 @@ def get_memory_value(addr):
     
     # match = int(match[0][2:-1], 16)
 
-    # assume 64 bit access
-    # TODO: NEED TO FIX THIS maybe with MemoryAccess.getBaseRegoster
-    mem = MemoryAccess(addr.getAddress(), 8)
+    # recall that the input to this function is w_addr[0]
+    # alternatively w_addr[1].evaluate()
+    mem = MemoryAccess(addr.getAddress(), addr.getSize())
     return CTX.getConcreteMemoryValue(mem)
 
 def dump_instruction_accesses(instruction: Instruction):
@@ -162,13 +162,20 @@ if __name__ == '__main__':
     # Load the binary
     binary = loadBinary(CTX)
 
+    # set init register state in ExecutionInfo
+    EXECUTION_INFO.set_init_regs(CTX)
+
+    # TODO: Set initial memory if we need to
+
+    # TODO: Support argv
     # Define argvs
     # ctx.setConcreteMemoryAreaValue(BASE_ARGV + 0x100, b'sample/sample_2')
     # ctx.setConcreteMemoryAreaValue(BASE_ARGV + 0x200, b'hello world')
     # ctx.setConcreteMemoryValue(MemoryAccess(BASE_ARGV + 0, CPUSIZE.QWORD), BASE_ARGV + 0x100) # argv[0] = 'sample/sample_2'
     # ctx.setConcreteMemoryValue(MemoryAccess(BASE_ARGV + 8, CPUSIZE.QWORD), BASE_ARGV + 0x200) # argv[1] = 'hello world'
-    CTX.setConcreteRegisterValue(CTX.registers.rdi, 2)
+    # CTX.setConcreteRegisterValue(CTX.registers.rdi, 2)
     # ctx.setConcreteRegisterValue(ctx.registers.rsi, BASE_ARGV)
+
 
     # Let's emulate the binary from the entry point
     print('Starting emulation')

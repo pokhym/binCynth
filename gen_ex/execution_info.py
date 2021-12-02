@@ -1,5 +1,5 @@
 from typing import Dict, List, Tuple, Union
-from triton import MemoryAccess
+from triton import MemoryAccess, TritonContext
 from enum import Enum
 
 class InstructionType(Enum):
@@ -39,6 +39,12 @@ class InstructionInfo():
 class FunctionInfo():
     ii : List[InstructionInfo]
     call_depth : int
+    # TODO: unused as of now
+    initial_memory : List[Tuple[int, int]]
+    final_memory : List[Tuple[int, int]]
+    # TODO: unused as of now
+    inital_registers : List[Tuple[str, int]]
+    final_registers : List[Tuple[str, int]]
 
     def __init__(self, ii : List[InstructionInfo], call_depth : int):
         self.ii = ii
@@ -50,12 +56,19 @@ class ExecutionInfo():
     # index 0 will be the function that is called last
     # index len(fi) - 1 will be main
     fi : List[FunctionInfo]
-    registers_touched : List[Tuple[str, int]]
-    memory_touched : List[Tuple[str, int]]
+
+    # func_0 represents the top level call to the main function
+    func_0_init_regs : Dict[str, int]
+    func_0_init_memory : Dict[str, int]
 
     def __init__(self):
         self.ii = []
         self.fi = []
+        self.func_0_init_regs = {}
+
+    def set_init_regs(self, ctx : TritonContext):    
+        for reg in ctx.getAllRegisters():
+            self.func_0_init_regs.update({reg.getName() : ctx.getConcreteRegisterValue(reg)})
 
     def split_function(self):
         """
@@ -85,7 +98,7 @@ class ExecutionInfo():
         ret_idx.reverse()
         # assert(call_count == ret_count)
         assert(len(call_idx) == len(ret_idx))
-        
+
         for f_count in range(len(call_idx) - 1, -1, -1):
             f_insns = []
             f_call_depth = call_idx[f_count][1]
