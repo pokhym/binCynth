@@ -17,6 +17,10 @@ From this, we will extract
 3. The semantics of the program by dumping the SMT2
 
 
-Using scripts from `afl-unicorn` (`https://github.com/Battelle/afl-unicorn`) we are also able to easily load and dump state from 
+<!-- Using scripts from `afl-unicorn` (`https://github.com/Battelle/afl-unicorn`) we are also able to easily load and dump state from  -->
+
+## Relevant Files
+
+* `func_extraction.py`
 
 ## Function
