@@ -37,6 +37,8 @@ def get_memory_value(addr):
     """
         [@0x7ffffff7]:64 bv[63..0]
         r"\[@0x[0-9a-f]+\]"
+
+        Returns (size, value)
     """
     # match = re.findall(r"\[@0x[0-9a-f]+\]", addr_str)
     # assert(len(match) == 1)
@@ -46,7 +48,7 @@ def get_memory_value(addr):
     # recall that the input to this function is w_addr[0]
     # alternatively w_addr[1].evaluate()
     mem = MemoryAccess(addr.getAddress(), addr.getSize())
-    return CTX.getConcreteMemoryValue(mem)
+    return (addr.getSize(), CTX.getConcreteMemoryValue(mem))
 
 def dump_instruction_accesses(instruction: Instruction):
     """
@@ -65,34 +67,34 @@ def dump_instruction_accesses(instruction: Instruction):
         inst_type = InstructionType.RET_INST
     else:
         inst_type = InstructionType.NORMAL_INST
-    r_regs = []
-    w_regs = []
-    r_addrs = []
-    w_addrs = []
+    r_regs = {}
+    w_regs = {}
+    r_addrs = {}
+    w_addrs = {}
     smt = []
-    print("\tRead Registers:", end="")
+    print("\t\tRead Registers:", end="")
     for r_reg in instruction.getReadRegisters():
         reg_name_val = (r_reg[0].getName(), get_register_value(r_reg[0]))
-        r_regs.append(reg_name_val)
+        r_regs.update({reg_name_val[0] : reg_name_val[1]})
         print(reg_name_val[0] + "," + hex(reg_name_val[1]), end="|")
     print()
-    print("\tRead Addresses:", end="")
+    print("\t\tRead Addresses:", end="")
     for r_addr in instruction.getLoadAccess():
         addr_val = (r_addr[0].getAddress(), get_memory_value(r_addr[0]))
-        r_addrs.append(addr_val)
-        print(hex(addr_val[0]) + "," + hex(addr_val[1]), end="|")
+        r_addrs.update({addr_val[0] : addr_val[1]})
+        print(hex(addr_val[0]) + "," + hex(addr_val[1][1]), end="|")
     print()
-    print("\tWritten Registers:", end="")
+    print("\t\tWritten Registers:", end="")
     for w_reg in instruction.getWrittenRegisters():
         reg_name_val = (w_reg[0].getName(), get_register_value(w_reg[0]))
-        w_regs.append(reg_name_val)
+        w_regs.update({reg_name_val[0] : reg_name_val[1]})
         print(reg_name_val[0] + "," + hex(reg_name_val[1]), end="|")
     print()
-    print("\tgetStoreAccess:", end="")
+    print("\t\tgetStoreAccess:", end="")
     for w_addr in instruction.getStoreAccess():
         addr_val = (w_addr[0].getAddress(), get_memory_value(w_addr[0]))
-        w_addrs.append(addr_val)
-        print(hex(addr_val[0]) + "," + hex(addr_val[1]), end="|")
+        w_addrs.update({addr_val[0] : addr_val[1]})
+        print(hex(addr_val[0]) + "," + hex(addr_val[1][1]), end="|")
     print()
 
     for expression in instruction.getSymbolicExpressions():
@@ -185,5 +187,7 @@ if __name__ == '__main__':
     print("Processing ExecutionInfo...")
     print("Splitting functions...")
     EXECUTION_INFO.split_function()
+    print("Processing function input arguments...")
+    EXECUTION_INFO.extract_function_input_arguments()
 
     sys.exit(0)

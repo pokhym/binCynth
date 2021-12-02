@@ -2,6 +2,9 @@ from typing import Dict, List, Tuple, Union
 from triton import MemoryAccess, TritonContext
 from enum import Enum
 
+# String identifiers for which registers are used for input arguments
+ARGUMENT_REGISTERS = {"rdi", "edi", "rsi", "esi", "rdx", "edx", "rcx", "ecx", "r8", "r9"}
+
 class InstructionType(Enum):
     NORMAL_INST = 0
     CALL_INST = 1
@@ -15,30 +18,32 @@ class InstructionInfo():
     # 2 = ret
     inst_type : InstructionType
     # The registers read along with their values
-    r_regs : List[Tuple[str, int]]
+    r_regs : Dict[str, int] # reg name -> val
     # The registers written along with their values
-    w_regs : List[Tuple[str, int]]
+    w_regs : Dict[str, int] # reg name -> val
     # Addresses read and the value read
-    r_addr : List[Tuple[int, int]]
+    r_addrs : Dict[int, Tuple[int, int]] # address -> (size, val)
     # Addresses written and the values written
-    w_addr : List[Tuple[int, int]]
+    w_addrs : Dict[int, Tuple[int, int]] # address -> (size, val)
     # The symbolic semantics of instruction
     # None should be Register but I cannot find where it is imported from
     smt : List[Tuple[Union[None, MemoryAccess], str]]
 
-    def __init__(self, eip : int, inst_type : InstructionType, r_regs : List[Tuple[str, int]], w_regs : List[Tuple[str, int]], \
-                r_addr : List[Tuple[int, int]], w_addr : List[Tuple[int, int]], smt : List[str]):
+    def __init__(self, eip : int, inst_type : InstructionType, r_regs : Dict[str, int], w_regs : Dict[str, int], \
+                r_addrs : Dict[int, Tuple[int, int]], w_addrs : Dict[int, Tuple[int, int]], smt : List[str]):
         self.eip = eip
         self.inst_type = inst_type
         self.r_regs = r_regs
         self.w_regs = w_regs
-        self.r_addr = r_addr
-        self.w_addr = w_addr
+        self.r_addrs = r_addrs
+        self.w_addrs = w_addrs
         self.smt = smt
 
 class FunctionInfo():
     ii : List[InstructionInfo]
     call_depth : int
+    # input arguments
+    i_args : Dict[int, int] # address ebp -> value
     # TODO: unused as of now
     initial_memory : List[Tuple[int, int]]
     final_memory : List[Tuple[int, int]]
@@ -49,6 +54,36 @@ class FunctionInfo():
     def __init__(self, ii : List[InstructionInfo], call_depth : int):
         self.ii = ii
         self.call_depth = call_depth
+        self.i_args = {}
+
+    def determine_number_input_arguments(self):
+        """
+            Input arguments can be accessed by copying RDI, RSI and so on onto the stack
+            Caller:
+                mov edi, eax
+                call 0x113c
+            Callee:
+                ...
+                mov dword ptr [rbp - 4], edi
+        """
+        for i in self.ii:
+            # 1. if we are reading rbp
+            # 2. we are pulling from an ARGUMENT_REGISTERS
+            # 3. we are writing to 4 or 8 offset from rbp value
+            if "rbp" in i.r_regs \
+                    and len(set(i.r_regs.keys()).intersection(ARGUMENT_REGISTERS)) > 0:
+                assert(len(set(i.r_regs.keys()).intersection(ARGUMENT_REGISTERS)) == 1)
+                if i.r_regs["rbp"] - 4 in i.w_addrs.keys():
+                    assert(i.r_regs["rbp"] - 4 in i.w_addrs.keys())
+                    self.i_args.update({i.r_regs["rbp"] - 4 : i.w_addrs[i.r_regs["rbp"] - 4]})
+                elif i.r_regs["rbp"] - 8 in i.w_addrs.keys():
+                    assert(i.r_regs["rbp"] - 8 in i.w_addrs.keys())
+                    self.i_args.update({i.r_regs["rbp"] - 8 : i.w_addrs[i.r_regs["rbp"] - 8]})
+                else:
+                    print("[FunctionInfo] determine_number_input_arguments: Different offset from RBP detected. RBP", i.r_regs["rbp"], ", written addresses", i.w_addrs)
+            elif "ebp" in i.r_regs:
+                print("[FunctionInfo] determine_number_input_arguments: EBP detected even though we are using 64bit")
+                exit(-1)
     
 class ExecutionInfo():
     ii : List[InstructionInfo]
@@ -111,6 +146,19 @@ class ExecutionInfo():
 
         for fi in self.fi:
             print(len(fi.ii))
+    
+    def extract_function_input_arguments(self):
+        """
+            https://en.wikipedia.org/wiki/X86_calling_conventions
+            We are assuming x86-64 and System-V calling convention
+
+            The first six integer or pointer arguments are passed in registers
+            RDI, RSI, RDX, RCX, R8, R9 (R10 is used as a static chain pointer in case of nested functions),
+            while XMM0, XMM1, XMM2, XMM3, XMM4, XMM5, XMM6 and XMM7 are used for the first floating point arguments.
+        """
+        for fi in self.fi:
+            fi.determine_number_input_arguments()
+            print(fi.i_args)
 
 
     def create_init_smt(self):
