@@ -5,6 +5,7 @@ from triton     import TritonContext, ARCH, MemoryAccess, CPUSIZE, Instruction, 
 import sys
 import os
 import re
+from execution_info import ExecutionInfo, InstructionInfo, InstructionType
 
 # Registers Used
 # REGISTERS
@@ -13,8 +14,11 @@ import re
 TARGET = "/home/user/pysynth/tests/c/empty_main"
 TARGET = "/home/user/pysynth/tests/c/func_call"
 
-# Triton Context
+# Triton
 CTX : TritonContext
+
+# Execution Info
+EXECUTION_INFO : ExecutionInfo = ExecutionInfo()
 
 # Memory mapping
 BASE_ARGV  = 0x10000000
@@ -53,26 +57,50 @@ def dump_instruction_accesses(instruction: Instruction):
             To solve this pass the value before processing (we can check who reads/writes)
     """
     print(instruction)
+    eip = instruction.getAddress()
+    inst_type : InstructionType
+    if "call" in str(instruction):
+        inst_type = InstructionType.CALL_INST
+    elif "ret" in str(instruction):
+        inst_type = InstructionType.RET_INST
+    else:
+        inst_type = InstructionType.NORMAL_INST
+    r_regs = []
+    w_regs = []
+    r_addrs = []
+    w_addrs = []
+    smt = []
     print("\tRead Registers:", end="")
     for r_reg in instruction.getReadRegisters():
-        reg_name_val = (r_reg[0].getName(), hex(get_register_value(r_reg[0])))
-        print(reg_name_val, end="|")
+        reg_name_val = (r_reg[0].getName(), get_register_value(r_reg[0]))
+        r_regs.append(reg_name_val)
+        print(reg_name_val[0] + "," + hex(reg_name_val[1]), end="|")
     print()
     print("\tRead Addresses:", end="")
     for r_addr in instruction.getLoadAccess():
-        addr_val = (hex(r_addr[0].getAddress()), hex(get_memory_value(r_addr[0])))
-        print(addr_val, end="|")
+        addr_val = (r_addr[0].getAddress(), get_memory_value(r_addr[0]))
+        r_addrs.append(addr_val)
+        print(hex(addr_val[0]) + "," + hex(addr_val[1]), end="|")
     print()
     print("\tWritten Registers:", end="")
     for w_reg in instruction.getWrittenRegisters():
-        reg_name_val = (w_reg[0].getName(), hex(get_register_value(w_reg[0])))
-        print(reg_name_val, end="|")
+        reg_name_val = (w_reg[0].getName(), get_register_value(w_reg[0]))
+        w_regs.append(reg_name_val)
+        print(reg_name_val[0] + "," + hex(reg_name_val[1]), end="|")
     print()
     print("\tgetStoreAccess:", end="")
     for w_addr in instruction.getStoreAccess():
-        addr_val = (hex(w_addr[0].getAddress()), hex(get_memory_value(w_addr[0])))
-        print(addr_val, end="|")
+        addr_val = (w_addr[0].getAddress(), get_memory_value(w_addr[0]))
+        w_addrs.append(addr_val)
+        print(hex(addr_val[0]) + "," + hex(addr_val[1]), end="|")
     print()
+
+    for expression in instruction.getSymbolicExpressions():
+        smt.append((expression.getOrigin(), expression))
+        # print(expression.getOrigin())
+    
+    curr_ii = InstructionInfo(eip, inst_type, r_regs, w_regs, r_addrs, w_addrs, smt)
+    EXECUTION_INFO.ii.append(curr_ii)
 
 # Emulate the binary.
 def emulate(ctx, pc):
@@ -146,5 +174,9 @@ if __name__ == '__main__':
     print('Starting emulation')
     emulate(CTX, binary.get_symbol('main').value)
     print('Emulation done')
+
+    print("Processing ExecutionInfo...")
+    print("Splitting functions...")
+    EXECUTION_INFO.split_function()
 
     sys.exit(0)
