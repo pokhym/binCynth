@@ -69,8 +69,8 @@ def execute_binary():
     mu.mem_map(ADDRESS, MEMORY_SIZE)
     # write machine code to be emulated to memory
     #  BINARY = b"\xf3\x0f\x1e\xfa"
-    mu.mem_write(ADDRESS, bytes(BINARY))
-    # mu.mem_write(ADDRESS, bytes(BINARY))
+    # mu.mem_write(ADDRESS, bytes(BINARY)[0x40:])
+    mu.mem_write(ADDRESS, bytes(BINARY)[0x1129:])
     # initialize regs
     mu.reg_write(UC_X86_REG_RAX, 0x0)
     mu.reg_write(UC_X86_REG_RBX, 0x0)
@@ -140,7 +140,9 @@ def execute_binary():
     print(">>> R14 = 0x%x" %r14)
     print(">>> R15 = 0x%x" %r15)
     try:
-        mu.emu_start(ADDRESS + 0x40, ADDRESS + 0x80)
+        print(len(BINARY))
+        # mu.emu_start(ADDRESS + 0x1129, ADDRESS + len(BINARY))
+        mu.emu_start(ADDRESS, ADDRESS + len(BINARY))
         a = 0
     except Exception as e:
         print("UNICORN ERROR: %s " % e)
