@@ -7,7 +7,8 @@ import os
 import re
 
 # Script options
-TARGET = "/home/user/pysynth/gen_ex/empty_main" # os.path.join(os.path.dirname(__file__), 'samples/sample_2')
+TARGET = "/home/user/pysynth/tests/c/empty_main"
+TARGET = "/home/user/pysynth/tests/c/func_call"
 
 # Triton Context
 CTX : TritonContext
@@ -54,7 +55,9 @@ def get_register_value(reg_str : str):
         return CTX.getConcreteRegisterValue(CTX.registers.ebp)
     elif "eip" in reg_str:
         return CTX.getConcreteRegisterValue(CTX.registers.eip)
-    elif "eflags" in reg_str:
+    elif "eflags" or "cf" or "pf" or "af" or "zf" or "sf" or "tf" or \
+                "if" or "df" or "of" or "nt" or "rf" or "vm" or "ac" or \
+                "vif" or "vip" or "id" in reg_str:
         return CTX.getConcreteRegisterValue(CTX.registers.eflags)
     elif "r8" in reg_str:
         print("r8 not yet implemented")
