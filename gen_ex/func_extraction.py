@@ -1,5 +1,6 @@
 # https://github.com/JonathanSalwan/Triton/issues/995
 from __future__ import print_function
+from typing import Dict
 from triton     import TritonContext, ARCH, MemoryAccess, CPUSIZE, Instruction, OPCODE, MODE
 
 import sys
@@ -61,10 +62,13 @@ def dump_instruction_accesses(instruction: Instruction):
     print(instruction)
     eip = instruction.getAddress()
     inst_type : InstructionType
+    return_regs : Dict[str, int]
     if "call" in str(instruction):
         inst_type = InstructionType.CALL_INST
     elif "ret" in str(instruction):
         inst_type = InstructionType.RET_INST
+    elif "leave" in str(instruction):
+        inst_type = InstructionType.LEAVE_INST
     else:
         inst_type = InstructionType.NORMAL_INST
     r_regs = {}
@@ -102,6 +106,12 @@ def dump_instruction_accesses(instruction: Instruction):
         # print(expression.getOrigin())
     
     curr_ii = InstructionInfo(eip, inst_type, r_regs, w_regs, r_addrs, w_addrs, smt)
+    # if ret add the return registers
+    if curr_ii.inst_type == InstructionType.RET_INST:
+        for _rr in curr_ii.return_regs.keys():
+            for r in CTX.getAllRegisters():
+                if r.getName() == _rr:
+                    curr_ii.return_regs.update({_rr : CTX.getConcreteRegisterValue(r)})
     EXECUTION_INFO.ii.append(curr_ii)
 
 # Emulate the binary.
@@ -187,7 +197,7 @@ if __name__ == '__main__':
     print("Processing ExecutionInfo...")
     print("Splitting functions...")
     EXECUTION_INFO.split_function()
-    print("Processing function input arguments...")
-    EXECUTION_INFO.extract_function_input_arguments()
+    print("Processing function input/output per function...")
+    EXECUTION_INFO.extract_function_input_output()
 
     sys.exit(0)

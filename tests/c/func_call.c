@@ -7,6 +7,5 @@ int modify_stuff(int a, int b){
 int main(void){
     int a = 5;
     int b = 1;
-    a++;
     return modify_stuff(a, b);
 }
