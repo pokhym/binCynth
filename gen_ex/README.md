@@ -10,6 +10,8 @@ These two components will allow us to break down a binary into smaller parts and
 We will use `Triton` (`https://github.com/JonathanSalwan/Triton`) as a CPU emulator to emulate the program and get the input output values.
 This is based on `unicorn` (`unicorn` (`https://github.com/unicorn-engine/unicorn/`) which in tuern is based upon QEMU.
 
+Additionall we also use `lief` (`https://lief-project.github.io/`) to easily process ELF binaries for Linux systems.
+
 From this, we will extract
 
 1. The registers read and written per instruction + values
