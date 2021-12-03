@@ -2,6 +2,7 @@
 from __future__ import print_function
 from typing import Dict, List, Tuple
 from typing_extensions import runtime
+from io_example import IOExample
 from triton     import TritonContext, ARCH, MemoryAccess, CPUSIZE, Instruction, OPCODE, MODE
 
 import sys
@@ -9,15 +10,17 @@ import os
 import re
 from execution_info import ExecutionInfo, InstructionInfo, InstructionType
 
-# Max Values
-
 # Script options
 TARGET = "/home/user/pysynth/tests/c/empty_main"
 TARGET = "/home/user/pysynth/tests/c/func_call"
 INPUT_EXAMPLES = "/home/user/pysynth/tests/python/triton_int_only_example_1.txt"
 
+# IO Examples
+IO_EXAMPLES : Dict[bytes, IOExample] = {}
+
 # Triton
 CTX : TritonContext
+MAIN_STACK_OFFSET = 8
 
 # Execution Info
 EXECUTION_INFO : ExecutionInfo
@@ -106,7 +109,8 @@ def dump_instruction_accesses(instruction: Instruction):
         smt.append((expression.getOrigin(), expression))
         # print(expression.getOrigin())
     
-    curr_ii = InstructionInfo(eip, inst_type, r_regs, w_regs, r_addrs, w_addrs, smt)
+    # ''.join(r'\x'+hex(letter)[2:] for letter in instruction.getOpcode())
+    curr_ii = InstructionInfo(eip, inst_type, r_regs, w_regs, r_addrs, w_addrs, smt, instruction.getOpcode())
     # if ret add the return registers
     if curr_ii.inst_type == InstructionType.RET_INST:
         for _rr in curr_ii.return_regs.keys():
@@ -184,7 +188,7 @@ def run_triton(input_example):
     EXECUTION_INFO.set_init_regs(CTX)
 
     # set initial stack variables
-    curr_offset = 8
+    curr_offset = MAIN_STACK_OFFSET # 8
     for arg in input_example:
         print(arg)
         rbp = CTX.getConcreteRegisterValue(CTX.registers.rbp)
@@ -214,8 +218,24 @@ def run_triton(input_example):
     print("Processing ExecutionInfo...")
     print("Splitting functions...")
     EXECUTION_INFO.split_function()
+    print("Calculating function identifiers...")
+    EXECUTION_INFO.calculate_fi_hex_ids()
     print("Processing function input/output per function...")
     EXECUTION_INFO.extract_function_input_output()
+    print("Updating final IO examples...")
+    update_io_examples(input_example)
+
+def update_io_examples(input_example):
+    global IO_EXAMPLES
+    for fi in EXECUTION_INFO.fi:
+        if fi.hash_id not in IO_EXAMPLES.keys():
+            IO_EXAMPLES.update({fi.hash_id : IOExample()})
+        # if this is the init function call, we need to add the original input
+        if fi.call_depth == 0:
+            IO_EXAMPLES[fi.hash_id].add_func0_iargs(input_example)
+        else:
+            IO_EXAMPLES[fi.hash_id].add_iargs(fi.i_args)
+        IO_EXAMPLES[fi.hash_id].add_oargs(fi.o_args)
 
 def check_type(type_val : Tuple[str, str]):
     if type_val[0] == "int32":
@@ -247,5 +267,9 @@ if __name__ == '__main__':
     examples = parse_examples()
     for ex in examples:
         run_triton(ex)
-    # run_triton([])
+    for func_hash_id, io in IO_EXAMPLES.items():
+        print(func_hash_id)
+        print("\t", io.i_args)
+        print("\t", io.o_args)
+        print()
     sys.exit(0)

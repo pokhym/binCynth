@@ -2,6 +2,7 @@ from typing import Dict, List, Tuple, Union
 from triton import MemoryAccess, TritonContext
 from enum import Enum
 import copy
+import hashlib
 
 # TODO: Add more
 # String identifiers for which registers are used for input arguments
@@ -18,10 +19,11 @@ class InstructionType(Enum):
 class InstructionInfo():
     # Which specific instruction is being executed
     eip : int
-    # 0 = normal instruction
-    # 1 = call
-    # 2 = ret
+    # An enum identifier for the type of instruction used to determine
+    # whether we are leaving/entering a function
     inst_type : InstructionType
+    # The bytes of an instruction, used to determine the uniqueness of a function
+    opcode : bytes
     # The registers read along with their values
     r_regs : Dict[str, int] # reg name -> val
     # The registers written along with their values
@@ -38,7 +40,7 @@ class InstructionInfo():
     return_regs : Dict[str, int]
 
     def __init__(self, eip : int, inst_type : InstructionType, r_regs : Dict[str, int], w_regs : Dict[str, int], \
-                r_addrs : Dict[int, Tuple[int, int]], w_addrs : Dict[int, Tuple[int, int]], smt : List[str]):
+                r_addrs : Dict[int, Tuple[int, int]], w_addrs : Dict[int, Tuple[int, int]], smt : List[str], opcode : bytes):
         self.eip = eip
         self.inst_type = inst_type
         self.r_regs = r_regs
@@ -46,6 +48,7 @@ class InstructionInfo():
         self.r_addrs = r_addrs
         self.w_addrs = w_addrs
         self.smt = smt
+        self.opcode = opcode
         
         self.return_regs = {}
         for _or in OUTPUT_REGISTERS:
@@ -64,11 +67,15 @@ class FunctionInfo():
     inital_registers : List[Tuple[str, int]]
     final_registers : List[Tuple[str, int]]
 
+    # hash of ii.bytes to determine a function identifier
+    hash_id : bytes
+
     def __init__(self, ii : List[InstructionInfo], call_depth : int):
         self.ii = ii
         self.call_depth = call_depth
         self.i_args = {}
         self.o_args = {}
+        self.hash_id = None
 
     def determine_input_arguments(self):
         """
@@ -132,6 +139,14 @@ class FunctionInfo():
                 for _or in o_reg:
                     self.o_args.update({_or : ret_instruction.return_regs[_or]})
                     regs_not_yet_used.remove(_or)
+    
+    def calc_hash_id(self):
+        m = hashlib.sha256()
+
+        for ii in self.ii:
+            m.update(ii.opcode)
+        self.hash_id = m.digest()
+            
     
 class ExecutionInfo():
     ii : List[InstructionInfo]
@@ -227,6 +242,10 @@ class ExecutionInfo():
             print(fi.i_args)
             fi.determine_output_arguments()
             print(fi.o_args)
+    
+    def calculate_fi_hex_ids(self):
+        for fi in self.fi:
+            fi.calc_hash_id()
 
 
     def create_init_smt(self):
