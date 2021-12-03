@@ -1,6 +1,7 @@
 # https://github.com/JonathanSalwan/Triton/issues/995
 from __future__ import print_function
-from typing import Dict
+from typing import Dict, List, Tuple
+from typing_extensions import runtime
 from triton     import TritonContext, ARCH, MemoryAccess, CPUSIZE, Instruction, OPCODE, MODE
 
 import sys
@@ -8,18 +9,18 @@ import os
 import re
 from execution_info import ExecutionInfo, InstructionInfo, InstructionType
 
-# Registers Used
-# REGISTERS
+# Max Values
 
 # Script options
 TARGET = "/home/user/pysynth/tests/c/empty_main"
 TARGET = "/home/user/pysynth/tests/c/func_call"
+INPUT_EXAMPLES = "/home/user/pysynth/tests/python/triton_int_only_example_1.txt"
 
 # Triton
 CTX : TritonContext
 
 # Execution Info
-EXECUTION_INFO : ExecutionInfo = ExecutionInfo()
+EXECUTION_INFO : ExecutionInfo
 
 # Memory mapping
 BASE_ARGV  = 0x10000000
@@ -152,13 +153,15 @@ def load_binary(ctx):
 
     return binary
 
-def run_triton():
-    """"""
-
-
-if __name__ == '__main__':
+def run_triton(input_example):
+    """
+        Main loop to do multiple runs of Triton
+    """
+    global CTX, EXECUTION_INFO
     # Set the architecture
     CTX = TritonContext(ARCH.X86_64)
+
+    EXECUTION_INFO = ExecutionInfo()
 
     # Set a symbolic optimization mode
     CTX.setMode(MODE.ALIGNED_MEMORY, True)
@@ -179,6 +182,17 @@ if __name__ == '__main__':
 
     # set init register state in ExecutionInfo
     EXECUTION_INFO.set_init_regs(CTX)
+
+    # set initial stack variables
+    curr_offset = 8
+    for arg in input_example:
+        print(arg)
+        rbp = CTX.getConcreteRegisterValue(CTX.registers.rbp)
+        print(hex(rbp - curr_offset - arg[0]))
+        mem = MemoryAccess(rbp - curr_offset - arg[0], arg[0])
+        CTX.setConcreteMemoryValue(mem, arg[1])
+        # update offset to stack
+        curr_offset += arg[0]
 
     # TODO: Set initial memory if we need to
 
@@ -203,4 +217,35 @@ if __name__ == '__main__':
     print("Processing function input/output per function...")
     EXECUTION_INFO.extract_function_input_output()
 
+def check_type(type_val : Tuple[str, str]):
+    if type_val[0] == "int32":
+        return (CPUSIZE.DWORD, int(type_val[1]))
+    else:
+        print("Invalid example input type", type_val)
+        exit(-1)
+
+def parse_examples():
+    exs = []
+    with open(INPUT_EXAMPLES, "r") as fd:
+        while True:
+            buf = fd.readline()
+            if not buf:
+                break
+            buf = buf.replace("\n", "")
+            buf = buf.rstrip(",")
+            # print(buf)
+            buf = buf.split(",")
+            assert(len(buf) % 2 == 0)
+            for i in range(0, len(buf), 2):
+                print(i, i + 1)
+            ex = [check_type(buf)]
+            exs.append(ex)
+        fd.close()
+    return exs
+
+if __name__ == '__main__':
+    examples = parse_examples()
+    for ex in examples:
+        run_triton(ex)
+    # run_triton([])
     sys.exit(0)
