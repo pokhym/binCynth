@@ -4,6 +4,7 @@
 # synth engine stuff
 io_ex_*
 synthed_*
+tests/example*
 
 # ignore c stuff
 **/*.gch

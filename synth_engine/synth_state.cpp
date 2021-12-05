@@ -199,7 +199,7 @@ void SynthState::synth_state_dump(){
     // std::cout << "\t\t";
     for(int f : this->function_choice){
         std::cout << "\t\t";
-        std::cout << "func_choice: " <<  f << std::endl;
+        std::cout << "func_choice: " <<  f << ":" << FUNC_NAMES[f] << std::endl;
         // for(ComponentState * cs : this->component_state){
         //     if(cs->comp_type == f){
         //         std::cout << "\t\tcomp_state:" << cs->comp_type << std::endl;
@@ -242,7 +242,13 @@ std::string SynthState::get_synthesized_function(){
     // synth_c += "#include \"components.hpp\"\n\n";
 
     // prepend the functions used so that we have no imports
+    std::set<std::string> functions_seen;
     for(int idx = 0 ; idx < (int)this->function_choice.size() ; idx++){
+        std::string curr_func_name = FUNC_NAMES[this->function_choice[idx]];
+        if(functions_seen.count(curr_func_name) > 0)
+            continue;
+        else
+            functions_seen.insert(curr_func_name);
         synth_c += FUNC_CODE[this->function_choice[idx]];
     }
 

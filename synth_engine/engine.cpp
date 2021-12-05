@@ -229,31 +229,39 @@ void Engine::clear_synth_state(){
 void Engine::choose_func(int num_func_to_choose){
     std::map<std::vector<int>, SynthState *>::iterator it = this->synth_state.begin();
     std::vector<std::vector<int>> ret;
+    // Needed because for 3 unique functions 0,1,2 and num_func_to_choose = 3
+    // We could have
+    //      0 -> 0 -> 0
+    //      0 -> 1 -> 1
+    //      0 -> 1 -> 2
+    // We need to be able to account for duplicates
+    int total_candidates = num_func_to_choose * FUNCS_NUM;
+    std::cout<< "FUNCS_NUM " << FUNCS_NUM << " NUM_FUNC_TO_CHOOSE " << num_func_to_choose << " TOTAL NUMBER OF CANDIDATES " << total_candidates << std::endl; 
 
-    std::cout<< "FUNCS_NUM " << FUNCS_NUM << " NUM_FUNC_TO_CHOOSE " << num_func_to_choose << std::endl; 
+    ret = nCk(total_candidates, num_func_to_choose);
 
-    ret = nCk(FUNCS_NUM, num_func_to_choose);
+    // filter out the permutations we need
+    std::set<std::vector<int>> set_combs;
+    for(int i = 0 ; i < ret.size() ; i++){
+        std::vector<int> comb = ret[i];
+        for(int j = 0 ; j < comb.size() ; j++){
+            comb[j] = comb[j] % FUNCS_NUM;
+        }
+        set_combs.insert(comb);
+    }
     
-    // for each combination
-    for(std::vector<int> comb : ret){
-        // print the combination
-        std::cout << "FUNC COMBINATION: ";
+    // for each permutation
+    for(std::vector<int> comb : set_combs){
+        // print the permutation
+        std::cout << "FUNC PERMUTATION: ";
         for(int ele : comb)
-            std::cout << ele << " ";
+            std::cout << ele << ":" << FUNC_NAMES[ele] << " ";
         std::cout << std::endl;
-        // generate the permutations of ordering
-        do {
-            std::cout << "\tPERMUTATION: ";
-            for(int ele : comb)
-                std::cout << ele << " ";
-            std::cout << std::endl;
-            // std::cout << "\t" << comb << '\n';
-            
-            // Add this instruction order to the synth_state map
-            SynthState * ss = new SynthState(comb, this->num_input_arguments
-                                        , this->target_synth_count, this->current_synth_count);
-            this->synth_state.insert(it, std::pair<std::vector<int>, SynthState *>(comb, ss));
-        } while(std::next_permutation(comb.begin(), comb.end()));
+
+        // Add this instruction order to the synth_state map
+        SynthState * ss = new SynthState(comb, this->num_input_arguments
+                                    , this->target_synth_count, this->current_synth_count);
+        this->synth_state.insert(it, std::pair<std::vector<int>, SynthState *>(comb, ss));
     }
     // it = this->synth_state.begin();
     // for(it = this->synth_state.begin() ; it != synth_state.end() ; it++){
