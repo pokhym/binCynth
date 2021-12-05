@@ -1,7 +1,7 @@
 #include "synth_state.hpp"
 
 #define SYNTH_STATE_DEBUG 1
-#undef SYNTH_STATE_DEBUG
+// #undef SYNTH_STATE_DEBUG
 
 /*** PUBLIC ***/
 
@@ -148,6 +148,9 @@ bool SynthState::update_constants(bool increment_constant_count){
             // re-insert default in_ids
             for(int i = 0 ; i < this->num_input_arguments ; i++)
                 c->in_id.insert(-1 * (i + 1));
+            // insert the previous function's arguments
+            for(int i = 0 ; i < c->func_choice_id ; i ++)
+                c->in_id.insert(i);
             
             std::vector<std::vector<int>> ret;
             std::vector<int> in_id_vec(c->in_id.begin(), c->in_id.end());
@@ -179,7 +182,8 @@ bool SynthState::update_constants(bool increment_constant_count){
                         //     std::cout << "AAAAAAAAA" << std::endl;
                         //     return false;
                         // }
-                        perm.push_back(in_id_vec[ele]);
+                        if(ele < in_id_vec.size())
+                            perm.push_back(in_id_vec[ele]);
                     }
                     // insert the permutation
                     c->in_id_perm.insert(perm);
@@ -196,18 +200,18 @@ void SynthState::synth_state_dump(){
     for(int f : this->function_choice){
         std::cout << "\t\t";
         std::cout << "func_choice: " <<  f << std::endl;
-        // for(ComponentState * cs : this->component_state){
-        //     if(cs->comp_type == f){
-        //         std::cout << "\t\tcomp_state:" << cs->comp_type << std::endl;
-        //         for(std::vector<int> ipv : cs->in_id_perm){
-        //             std::cout << "\t\t\t";
-        //             for(int ipe : ipv){
-        //                 std:: cout << ipe << " ";
-        //             }
-        //             std::cout << std::endl;
-        //         }
-        //     }
-        // }
+        for(ComponentState * cs : this->component_state){
+            if(cs->comp_type == f){
+                std::cout << "\t\tcomp_state:" << cs->comp_type << std::endl;
+                for(std::vector<int> ipv : cs->in_id_perm){
+                    std::cout << "\t\t\t";
+                    for(int ipe : ipv){
+                        std:: cout << ipe << " ";
+                    }
+                    std::cout << std::endl;
+                }
+            }
+        }
     }
     std::cout << std::endl;
 }
@@ -222,6 +226,10 @@ bool SynthState::evaluate(std::vector<std::map<int, uint64_t> *> * examples){
     perm.clear();
     // make recursive call here
     // perm.push_back(*this->component_state[0]->in_id_perm.begin());
+
+    if(!(this->function_choice[0] == 3 && this->function_choice[1] == 2 && this->function_choice[2] == 0))
+        return this->synthesized;
+
     evaluate_helper(examples
         // , this->perm 
         , 0);
@@ -414,6 +422,13 @@ bool SynthState::execute(std::vector<std::map<int, uint64_t> *> * examples){
         for(int func_idx = 0 ; func_idx < num_funcs ; func_idx++){
             switch(this->perm[func_idx].size()){
                 case 1:{
+                    // determine if it is trying to use a future variable
+                    if(this->perm[func_idx][0] >= func_idx){
+                        delete io;
+                        std::cout << "ERROR: " << this->function_choice[func_idx] << " Trying to use a future output variable " << this->perm[func_idx][0] << std::endl;
+                        return false;    
+                    }
+
                     // initialize a return variable
                     uint64_t ret = 0;
                     // execute the component
@@ -422,22 +437,38 @@ bool SynthState::execute(std::vector<std::map<int, uint64_t> *> * examples){
                         // std::cout<< io->at(this->perm[func_idx][0]) << std::endl;
                         // std::cout << io->at(this->perm[func_idx][1]) << std::endl;
                         ret = ((func_ptr_o_int_i_int)(*(FUNCS[this->function_choice[func_idx]])))(io->at(this->perm[func_idx][0]));
+#ifdef SYNTH_STATE_DEBUG
+                        std::cout << "\tcase 1: " << this->function_choice[func_idx] << " " << this->perm[func_idx][0] << ":" << (int) io->at(this->perm[func_idx][0]) << std::endl;
+#endif
                     }
                     else{
                         std::cout << "ERROR: Unimplemented function ptr type of input size of 1" << std::endl;
                         delete io;
                         return false;
                     }
+// #ifdef SYNTH_STATE_DEBUG
+//                     std::cout << "Executing func: " << this->function_choice[func_idx] << " " << FUNC_NAMES[this->function_choice[func_idx]] << ", args: "<< io->at(this->perm[func_idx][0]) << ", Return value: " << ret << std::endl;
+// #endif
                     // update the io
-                    io->insert({func_idx, ret});
+                    // io->insert({func_idx, ret});
+                    io->at(func_idx) = ret;
                     break;
                 }
                 case 2:{
+                    // determine if it is trying to use a future variable
+                    if(this->perm[func_idx][0] >= func_idx || this->perm[func_idx][1] >= func_idx){
+                        delete io;
+                        std::cout << "ERROR: " << this->function_choice[func_idx] << " Trying to use a future output variable " << this->perm[func_idx][0] << " " << this->perm[func_idx][1] << std::endl;
+                        return false;    
+                    }
                     // initialize a return variable
                     uint64_t ret = 0;
                     // execute the component
                     if(FUNC_PTR_TYPE_CAST[this->function_choice[func_idx]] == e_func_ptr_o_int_i_int_i_int){
                         ret = ((func_ptr_o_int_i_int_i_int)(*(FUNCS[this->function_choice[func_idx]])))(io->at(this->perm[func_idx][0]), io->at(this->perm[func_idx][1]));
+#ifdef SYNTH_STATE_DEBUG
+                        std::cout << "\tcase 2: " << this->function_choice[func_idx] << " " << this->perm[func_idx][0] << ":" << (int)io->at(this->perm[func_idx][0]) << " " << this->perm[func_idx][1] << ":"  << (int)io->at(this->perm[func_idx][1]) << std::endl;
+#endif
                     }
                     else{
                         std::cout << "ERROR: Unimplemented function ptr type of input size of 2" << std::endl;
@@ -445,11 +476,12 @@ bool SynthState::execute(std::vector<std::map<int, uint64_t> *> * examples){
                         return false;
                     }
                     // ret = FUNCS[this->function_choice[func_idx]](io->at(this->perm[func_idx][0]), io->at(this->perm[func_idx][1]));
-#ifdef SYNTH_STATE_DEBUG
-                    std::cout << "Executing func: " << this->function_choice[func_idx] << " " << FUNC_NAMES[this->function_choice[func_idx]] << ", args: "<< io->at(this->perm[func_idx][0]) << " " << io->at(this->perm[func_idx][1]) << ", Return value: " << ret << std::endl;
-#endif
+// #ifdef SYNTH_STATE_DEBUG
+//                     std::cout << "Executing func: " << this->function_choice[func_idx] << " " << FUNC_NAMES[this->function_choice[func_idx]] << ", args: "<< io->at(this->perm[func_idx][0]) << " " << io->at(this->perm[func_idx][1]) << ", Return value: " << ret << std::endl;
+// #endif
                     // update the io
-                    io->insert({func_idx, ret});
+                    // io->insert({func_idx, ret});
+                    io->at(func_idx) = ret;
                     break;
                 }
                 default:{
@@ -464,8 +496,10 @@ bool SynthState::execute(std::vector<std::map<int, uint64_t> *> * examples){
         // dump the result map
         std::cout << "Dumping Result map" << std::endl;
         for(auto it = io->begin() ; it != io->end() ; it++){
-            std::cout << "\t" << it->first << " " << it->second << std::endl;
+            if(it->first >= 0)
+                std::cout << "\t" << it->first << " " << (int)it->second << std::endl;
         }
+        std::cout << "\tio->at(num_funcs - 1) != out: " << (io->at(num_funcs - 1) != out) << std::endl; 
 #endif
         // not all io examples matched
         if(io->at(num_funcs - 1) != out){
@@ -506,6 +540,10 @@ uint64_t SynthState::create_io(std::map<int, uint64_t> * example, std::map<int, 
     std::map<int, uint64_t>::iterator const_it;
     for(const_it = this->const_id_to_cs.begin() ; const_it != this->const_id_to_cs.end() ; const_it++){
         ret->insert({const_it->first, const_it->second});
+    }
+    // update to allow for inputs from other functions
+    for(int i = 0 ; i < this->function_choice.size() ; i++){
+        ret->insert({i, NULL});
     }
     return out;
 }

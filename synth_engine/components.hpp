@@ -2,7 +2,7 @@
 #define COMPONENTS_H
 
 /*** CONST_MAX_BIT ***/
-static const int CONST_MAX_BIT = 5;
+static const int CONST_MAX_BIT = 4;
 
 /*** FUNC_PTR_TYPES ***/
 typedef void (* func_ptr) (void);
