@@ -1,6 +1,10 @@
 # vscode
 **/.vscode/**
 
+# synth engine stuff
+io_ex_*
+synthed_*
+
 # ignore c stuff
 **/*.gch
 **/*.o

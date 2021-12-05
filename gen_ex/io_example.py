@@ -24,10 +24,13 @@ class IOExample():
         """
             format determined by parse_examples() in func_extraction.py
             Currently List[Tuple[int, int]] = [(size, val)]
+
+            TODO: Currently assuming only 32 bit int
+                Change (4, ia[1])
         """
         i = []
         for ia in i_args:
-            i.append((-MAIN_STACK_OFFSET - ia[0], ia[1]))
+            i.append((-MAIN_STACK_OFFSET - ia[0], (4, ia[1])))
         i = sorted(i, key=lambda x: x[0], reverse=True)
         self.i_args.append(i)
         

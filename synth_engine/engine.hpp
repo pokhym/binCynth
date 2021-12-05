@@ -26,10 +26,10 @@ class Engine {
         int max_instrs;
         // Number of input arguments to the function we are trying to synthesize
         int num_input_arguments;
-        // Path relative to the synth engine executable containing a binary
-        std::string path_to_binary;
         // Path relative to a CSV file containing IO examples
         std::string path_to_examples;
+        // Partial path to create new 
+        std::string partial_output_path;
         // How we delimit each part of an example
         std::string example_delimiter;
         // The word we use to mark a specific example argument as output
@@ -63,7 +63,7 @@ class Engine {
         /**
          * @brief Construct a new Engine object
          */
-        Engine(std::string path_to_binary, std::string path_to_examples, int max_instrs);
+        Engine(std::string path_to_examples, std::string partial_output_path ,int max_instrs);
         /**
          * @brief Destroy the Engine object
          */
@@ -96,8 +96,12 @@ class Engine {
 
         /**
          * @brief synth : Synthesize a function given a set of components to use
+         * 
+         * @returns int 
+         *  0 : successful
+         *  -1 : error, unable to synthesize target number of functions
          */
-        void synth();
+        int synth();
 
         /**
          * @brief verify : Verify that a synthesized function actually matches 
