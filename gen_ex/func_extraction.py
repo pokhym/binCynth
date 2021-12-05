@@ -4,7 +4,7 @@ from typing import Dict, List, Tuple
 from typing_extensions import runtime
 from io_example import IOExample
 from triton     import TritonContext, ARCH, MemoryAccess, CPUSIZE, Instruction, OPCODE, MODE
-from os.path import abspath
+from os.path import abspath, exists
 
 import sys
 import os
@@ -192,6 +192,17 @@ class FunctionExtractor:
         """
             Main loop to do multiple runs of Triton
         """
+        # Set the architecture
+        self.ctx = TritonContext(ARCH.X86_64)
+        # Set a symbolic optimization mode
+        self.ctx.setMode(MODE.ALIGNED_MEMORY, True)
+        # initialize all registers
+        for reg in self.ctx.getAllRegisters():
+            self.ctx.setConcreteRegisterValue(reg, 0)
+        # Define a stack
+        self.ctx.setConcreteRegisterValue(self.ctx.registers.rbp, BASE_STACK)
+        self.ctx.setConcreteRegisterValue(self.ctx.registers.rsp, BASE_STACK)
+        
         # clear execution info
         self.execution_info = ExecutionInfo()
         # Load the binary
@@ -261,6 +272,48 @@ class FunctionExtractor:
 
         return
 
+    def flatten_final_io(self):
+        """
+            Finally flattens the examples into text format and writes them out
+        """
+        if len(self.io_examples.keys()) == 0:
+            return None
+        count = 0
+        key_by_call_depth = self.io_examples.keys()
+        key_by_call_depth = sorted(key_by_call_depth, key=lambda x: x[1], reverse=True)
+        files_to_return = []
+        for k_cd in key_by_call_depth:
+            while True:
+                curr_file_name = abspath("io_ex_" + str(count) + ".txt")
+                if not exists(curr_file_name):
+                    files_to_return.append(curr_file_name)
+                    with open(curr_file_name, "w") as fd:
+                        # TODO: Assuming only integer 32 bit
+                        f_io = self.io_examples[k_cd]
+
+                        # check number of examples are the same
+                        assert(len(f_io.i_args) == len(f_io.o_args))
+                        for example_idx in range(len(f_io.i_args)):
+                            o_args = f_io.o_args[example_idx]
+                            i_args = f_io.i_args[example_idx]
+                            for o in o_args:
+                                # TODO: Only 32 bit ints
+                                fd.write("out,int32,")
+                                fd.write(str(o[1]))
+                                fd.write(",")
+                            for i_ex in i_args:
+                                # TODO: Only 32 bit ints
+                                fd.write("in,int32,")
+                                fd.write(str(i_ex[1][1]))
+                                fd.write(",")
+                            fd.write("\n")
+                    fd.close()
+                    count += 1
+                    break
+                # increment for next example
+                count += 1
+        return files_to_return
+        
     def run(self):
         # IO_EXAMPLES.clear()
         examples = self.parse_examples()
@@ -271,8 +324,8 @@ class FunctionExtractor:
             print("\t", io.i_args)
             print("\t", io.o_args)
             print()
-        return self.io_examples
+        return self.flatten_final_io()
 
 if __name__ == "__main__":
     fe = FunctionExtractor(INPUT_EXAMPLES, TARGET)
-    fe.run()
+    print(fe.run())

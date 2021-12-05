@@ -19,13 +19,13 @@
 import random
 
 
-NUM_EXAMPLES = 5
+NUM_EXAMPLES = 100
 NUM_INPUT_ARGUMENTS = 1
 INT32_IDENTIFIER = "int32"
 TYPE_SEP = ","
 ARG_SEP = ","
 INT_MIN = 0
-INT_MAX = 5
+INT_MAX = 100
 
 """
     An example will have the format of
@@ -40,7 +40,7 @@ def create_int_only(idx : int, num_input : int):
     with open("triton_int_only_example_" + str(idx) + ".txt", "w") as fd:
         for i in range(NUM_EXAMPLES):
             for j in range(num_input):
-                fd.write(INT32_IDENTIFIER + TYPE_SEP + str(random.randint(0,5)) + ARG_SEP)
+                fd.write(INT32_IDENTIFIER + TYPE_SEP + str(random.randint(INT_MIN,INT_MAX)) + ARG_SEP)
             fd.write("\n")
         fd.close()
 

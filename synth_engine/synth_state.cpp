@@ -231,17 +231,22 @@ bool SynthState::evaluate(std::vector<std::map<int, uint64_t> *> * examples){
 
 std::string SynthState::get_synthesized_function(){
     std::string synth_c;
-    synth_c += "#include \"components.hpp\"\n\n";
+    // synth_c += "#include \"components.hpp\"\n\n";
+
+    // prepend the functions used so that we have no imports
+    for(int idx = 0 ; idx < (int)this->function_choice.size() ; idx++){
+        synth_c += FUNC_CODE[this->function_choice[idx]];
+    }
 
     synth_c += "int synthed_";
-    synth_c += std::to_string(*this->current_synth_count);
+    synth_c += std::to_string(*this->current_synth_count + FUNCS_NUM);
     synth_c += "(";
     for(int i = 0 ; i < this->num_input_arguments ; i++){
         if(i == this->num_input_arguments - 1){
-            synth_c += "int in_" + std::to_string(i) + "){\n";
+            synth_c += "int in_" + std::to_string(i + 1) + "){\n";
         }
         else{
-            synth_c += "int in_" + std::to_string(i) + ","; 
+            synth_c += "int in_" + std::to_string(i + 1) + ","; 
         }
     }
 
@@ -283,7 +288,26 @@ std::string SynthState::get_synthesized_function(){
         }
         std::cout << std::endl;
     }
-    synth_c += "\treturn out_" + std::to_string(this->function_choice.size() - 1) + ";\n}";
+    synth_c += "\treturn out_" + std::to_string(this->function_choice.size() - 1) + ";\n}\n";
+
+    // output main
+    int main_niargs = this->num_input_arguments;
+    synth_c += "int main(){\n";
+    for(int i = 0 ; i < this->num_input_arguments ; i++){
+        synth_c += "\tint in_" + std::to_string(i + 1) + ";\n";
+    }
+    synth_c += "\treturn synthed_";
+    synth_c += std::to_string(*this->current_synth_count + FUNCS_NUM);
+    synth_c += "(";
+    for(int i = 0 ; i < this->num_input_arguments ; i++){
+        if(i == this->num_input_arguments - 1){
+            synth_c += "in_" + std::to_string(i + 1) + ");\n";
+        }
+        else{
+            synth_c += "in_" + std::to_string(i + 1) + ","; 
+        }
+    }
+    synth_c += "}\n";
     
     return synth_c;
 }
@@ -362,7 +386,8 @@ bool SynthState::execute(std::vector<std::map<int, uint64_t> *> * examples){
     // double check we can actually execute first
     for(int func_idx = 0; func_idx < (int)this->function_choice.size() ; func_idx++){
         // check the number of input arguments matches
-        if((int)this->perm[func_idx].size() != FUNCS_NUM_IARGS[func_idx]){
+        // if((int)this->perm[func_idx].size() != FUNCS_NUM_IARGS[func_idx]){
+        if((int)this->perm[func_idx].size() != FUNCS_NUM_IARGS[this->function_choice[func_idx]]){
             return false; // terminate if not true
         }
     }
@@ -389,16 +414,37 @@ bool SynthState::execute(std::vector<std::map<int, uint64_t> *> * examples){
         for(int func_idx = 0 ; func_idx < num_funcs ; func_idx++){
             switch(this->perm[func_idx].size()){
                 case 1:{
-                    std::cout << "ERROR: Unimplemented function input size of 1" << std::endl;
-                    delete io;
-                    return false;
+                    // initialize a return variable
+                    uint64_t ret = 0;
+                    // execute the component
+                    // execute the component
+                    if(FUNC_PTR_TYPE_CAST[this->function_choice[func_idx]] == e_func_ptr_o_int_i_int){
+                        // std::cout<< io->at(this->perm[func_idx][0]) << std::endl;
+                        // std::cout << io->at(this->perm[func_idx][1]) << std::endl;
+                        ret = ((func_ptr_o_int_i_int)(*(FUNCS[this->function_choice[func_idx]])))(io->at(this->perm[func_idx][0]));
+                    }
+                    else{
+                        std::cout << "ERROR: Unimplemented function ptr type of input size of 1" << std::endl;
+                        delete io;
+                        return false;
+                    }
+                    // update the io
+                    io->insert({func_idx, ret});
                     break;
                 }
                 case 2:{
                     // initialize a return variable
                     uint64_t ret = 0;
                     // execute the component
-                    ret = FUNCS[this->function_choice[func_idx]](io->at(this->perm[func_idx][0]), io->at(this->perm[func_idx][1]));
+                    if(FUNC_PTR_TYPE_CAST[this->function_choice[func_idx]] == e_func_ptr_o_int_i_int_i_int){
+                        ret = ((func_ptr_o_int_i_int_i_int)(*(FUNCS[this->function_choice[func_idx]])))(io->at(this->perm[func_idx][0]), io->at(this->perm[func_idx][1]));
+                    }
+                    else{
+                        std::cout << "ERROR: Unimplemented function ptr type of input size of 2" << std::endl;
+                        delete io;
+                        return false;
+                    }
+                    // ret = FUNCS[this->function_choice[func_idx]](io->at(this->perm[func_idx][0]), io->at(this->perm[func_idx][1]));
 #ifdef SYNTH_STATE_DEBUG
                     std::cout << "Executing func: " << this->function_choice[func_idx] << " " << FUNC_NAMES[this->function_choice[func_idx]] << ", args: "<< io->at(this->perm[func_idx][0]) << " " << io->at(this->perm[func_idx][1]) << ", Return value: " << ret << std::endl;
 #endif

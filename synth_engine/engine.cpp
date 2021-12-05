@@ -11,14 +11,14 @@
 
 /*** PUBLIC ***/
 
-Engine::Engine(std::string path_to_binary, std::string path_to_examples, int max_instrs){
+Engine::Engine(std::string path_to_examples, std::string partial_output_path, int max_instrs){
     std::cout <<"Initializing Engine stuff..." << std::endl;
-    this->path_to_binary = path_to_binary;
     this->path_to_examples = path_to_examples;
+    this->partial_output_path = partial_output_path;
     this->example_delimiter = ",";
     this->out_delimiter = "out";
     this->in_delimiter = "in";
-    this->int_delimiter = "int";
+    this->int_delimiter = "int32";
     this->target_synth_count = new int(2);
     this->current_synth_count = new int(0);
 
@@ -76,7 +76,7 @@ bool Engine::load_test_cases(){
     return true;
 }
 
-void Engine::synth(){
+int Engine::synth(){
     SynthState * ss = NULL;
     // keep track of how many we have synthesized before calling verify
     int count = 0;
@@ -102,7 +102,16 @@ void Engine::synth(){
         // }
         clear_synth_state();
     }
+    // terminate with error code if we fail to synthesize the target number of instructions
+    if(this->synthesized_functions.size() != *this->target_synth_count){
+        std::cout << "Failed on " << this->synthesized_functions.size() << "/" << *this->target_synth_count << std::endl;
+        return -1;
+    }
+
     this->dump_synthesized_function();
+
+    // return success
+    return 0;
 }
 
 SynthState * Engine::verify(){
@@ -254,16 +263,21 @@ void Engine::choose_func(int num_func_to_choose){
 }
 
 void Engine::dump_synthesized_function(){
-    if(this->synthesized_functions.size() == 0){
-        std::cout << "Unable to synthesize any functions for current parameters." << std::endl;
+    if(this->synthesized_functions.size() != *this->target_synth_count){
+        std::cout << "Unable to synthesize target number of functions for current parameters." << std::endl;
         return;
     }
 
     std::cout << "Able to synthesize the following functions." << std::endl << std::endl;
 
+    int count = 0;
     for(auto f : this->synthesized_functions){
         std::cout << "#############" << std::endl;
         std::cout << f << std::endl;
+        std::ofstream fd(this->partial_output_path + std::to_string(count + 1 + FUNCS_NUM) + ".cpp");
+        fd << f;
+        fd.close();
+        count++;
         std::cout << "#############" << std::endl;
     }
 }
