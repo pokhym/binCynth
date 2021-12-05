@@ -83,7 +83,7 @@ int Engine::synth(){
     // for 1 to the maximum number of instructions
     // consruction permutations of function combinations and inputs
     // then verify they work for the input set of 
-    for(int num_instr_to_choose = 3 ; num_instr_to_choose <= this->max_instrs ; num_instr_to_choose++){
+    for(int num_instr_to_choose = 1 ; num_instr_to_choose <= this->max_instrs ; num_instr_to_choose++){
         std::cout << "Synthesizing programs of size " << num_instr_to_choose << std::endl;
         choose_func(num_instr_to_choose);
         verify();

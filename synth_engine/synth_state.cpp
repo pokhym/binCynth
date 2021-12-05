@@ -1,7 +1,7 @@
 #include "synth_state.hpp"
 
 #define SYNTH_STATE_DEBUG 1
-// #undef SYNTH_STATE_DEBUG
+#undef SYNTH_STATE_DEBUG
 
 /*** PUBLIC ***/
 
@@ -200,18 +200,18 @@ void SynthState::synth_state_dump(){
     for(int f : this->function_choice){
         std::cout << "\t\t";
         std::cout << "func_choice: " <<  f << std::endl;
-        for(ComponentState * cs : this->component_state){
-            if(cs->comp_type == f){
-                std::cout << "\t\tcomp_state:" << cs->comp_type << std::endl;
-                for(std::vector<int> ipv : cs->in_id_perm){
-                    std::cout << "\t\t\t";
-                    for(int ipe : ipv){
-                        std:: cout << ipe << " ";
-                    }
-                    std::cout << std::endl;
-                }
-            }
-        }
+        // for(ComponentState * cs : this->component_state){
+        //     if(cs->comp_type == f){
+        //         std::cout << "\t\tcomp_state:" << cs->comp_type << std::endl;
+        //         for(std::vector<int> ipv : cs->in_id_perm){
+        //             std::cout << "\t\t\t";
+        //             for(int ipe : ipv){
+        //                 std:: cout << ipe << " ";
+        //             }
+        //             std::cout << std::endl;
+        //         }
+        //     }
+        // }
     }
     std::cout << std::endl;
 }
@@ -227,8 +227,8 @@ bool SynthState::evaluate(std::vector<std::map<int, uint64_t> *> * examples){
     // make recursive call here
     // perm.push_back(*this->component_state[0]->in_id_perm.begin());
 
-    if(!(this->function_choice[0] == 3 && this->function_choice[1] == 2 && this->function_choice[2] == 0))
-        return this->synthesized;
+    // if(!(this->function_choice[0] == 3 && this->function_choice[1] == 2 && this->function_choice[2] == 0))
+    //     return this->synthesized;
 
     evaluate_helper(examples
         // , this->perm 
