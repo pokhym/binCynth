@@ -1,22 +1,9 @@
+import sys
+sys.path.insert(0,"/usr/lib/python3.8/site-packages")
 from typing import List
 from triton import TritonContext, ARCH, MemoryAccess, CPUSIZE, Instruction, OPCODE, MODE
 import re
 from os.path import exists, abspath, splitext, join
-import pathlib
-
-OUTPUT_SMT = ""
-SMT_FILE_NAME = "out.smt2"
-PROGRAM_ID = 0
-TARGET = "/home/user/pysynth/tests/c/main_has_in_between"
-BASE_STACK = 0x7fffffff
-BYTES_TO_SYMBOLIZE = 0xFF
-NUM_ARGS = 0x2
-ARG_SIZE = CPUSIZE.DWORD
-
-CTX = TritonContext()
-CTX.setArchitecture(ARCH.X86_64)
-CTX.setMode(MODE.ALIGNED_MEMORY, True)
-
 
 class EquivalenceTest():
     ctx_0 : TritonContext
@@ -49,11 +36,11 @@ class EquivalenceTest():
         self.ctx_0.setMode(MODE.ALIGNED_MEMORY, True)
         self.ctx_1 = TritonContext()
         self.ctx_1.setArchitecture(ARCH.X86_64)
-        self.ctx_0.setMode(MODE.ALIGNED_MEMORY, True)
+        self.ctx_1.setMode(MODE.ALIGNED_MEMORY, True)
 
         # set up constants for Triton
         self.base_stack = 0x7fffffff
-        self.bytes_to_symbolize = 0xFF
+        self.bytes_to_symbolize = 0x10
 
         # number of input arguments
         self.num_iargs = num_iargs
@@ -156,6 +143,45 @@ class EquivalenceTest():
             exit(-1)
 
         return
+
+    def determine_stack_size(self, prog_path):
+        ctx = TritonContext(ARCH.X86_64)
+        ctx.setMode(MODE.ALIGNED_MEMORY, True)
+        for reg in ctx.getAllRegisters():
+            ctx.setConcreteRegisterValue(reg, 0)
+        ctx.setConcreteRegisterValue(ctx.registers.rbp, self.base_stack)
+        ctx.setConcreteRegisterValue(ctx.registers.rsp, self.base_stack)
+        binary = self.load_binary(ctx, prog_path)
+
+        pc = binary.get_symbol('main').value
+        instruction_count = 0
+        while pc and instruction_count < 4:
+            instruction_count += 1
+            # Fetch opcode
+            opcode = ctx.getConcreteMemoryAreaValue(pc, 16)
+
+            # Create the Triton instruction
+            instruction = Instruction()
+            instruction.setOpcode(opcode)
+            instruction.setAddress(pc)
+
+            # Process
+            ctx.processing(instruction)
+            # dump_instruction_accesses(instruction)
+            # print(instruction)
+
+            if instruction.getType() == OPCODE.X86.HLT:
+                break
+
+            # Next
+            pc = ctx.getConcreteRegisterValue(ctx.registers.rip)
+
+        assert("sub" in str(instruction))
+        assert("rsp" == instruction.getOperands()[0].getName())
+
+        # sub rsp, 0x20 <-- instruction.getOperands()[1].getValue() is 0x20
+        # ctx.getConcreteRegisterValue(ctx.getRegister('rsp')) <-- gets the rsp value
+        return (ctx.getConcreteRegisterValue(ctx.getRegister('rbp')), instruction.getOperands()[1].getValue(), ctx.getConcreteRegisterValue(ctx.getRegister('rsp')))
     
     def symbolize_registers(self, ctx, prog_id):
         sym_regs = []
@@ -165,7 +191,7 @@ class EquivalenceTest():
         # symbolize anything that isnt rbp and rsp
         output_smt += "; SYMBOLIC REGISTERS\n"
         for reg in ctx.getAllRegisters():
-            if reg.getName() != 'rbp' or reg.getName != 'rsp':
+            if True: # reg.getName() != 'rbp' or reg.getName != 'rsp':
                 sr = ctx.symbolizeRegister(reg, "prog_" + str(prog_id) + "_" + reg.getName() + "_sym")
                 sym_regs.append("prog_" + str(prog_id) + "_ref!" + str(sr.getId()))
                 # Declare sym var then output the references
@@ -181,6 +207,50 @@ class EquivalenceTest():
 
         # symbolize memory around the stack
         output_smt += "; SYMBOLIC MEMORY\n"
+
+        # rbp_main, rsp_main_sub, rsp_main = self.determine_stack_size(self.prog_path_0)
+        # curr_offset = 0
+        # # for arg_idx in range(2 - 1, -1, -1):
+        # #     size = CPUSIZE.DWORD
+        # #     for i in range(size):
+        # #         sm = ctx.symbolizeMemory(MemoryAccess(rbp_main - curr_offset - i, 1), "prog_" + str(prog_id) + "_" + "mo_" + hex(i + arg_idx * size))
+        # #         sym_mem.append("prog_" + str(prog_id) + "_ref!" + str(sm.getId()))
+        # #         # Declare sym var then output the references
+        # #         output_smt += "(declare-fun " + sm.getAlias() + "() (_ BitVec " + str(sm.getBitSize()) + "))\n"
+        # #         output_smt += str(ctx.getSymbolicExpression(sm.getId())) + "\n"
+        # #     # update offset to stack
+        # #     curr_offset += size
+        # # for arg_idx in range(0,2):
+
+        # mem = MemoryAccess(rsp_main - rsp_main_sub, rsp_main_sub)
+        # sm = ctx.symbolizeMemory(mem, "prog_" + str(prog_id) + "_" + "mo_" + hex(rsp_main_sub))
+        # sym_mem.append("prog_" + str(prog_id) + "_ref!" + str(sm.getId()))
+        # output_smt += "(declare-fun " + sm.getAlias() + "() (_ BitVec " + str(sm.getBitSize()) + "))\n"
+        # output_smt += str(ctx.getSymbolicExpression(sm.getId())) + "\n"
+        # return output_smt, sym_mem
+
+        # # size = CPUSIZE.DWORD
+        # # sm = ctx.symbolizeMemory(MemoryAccess(rbp_main - curr_offset + size, size), "prog_" + str(prog_id) + "_" + "mo_" + hex(0 * size))
+        # # sym_mem.append("prog_" + str(prog_id) + "_ref!" + str(sm.getId()))
+        # # # Declare sym var then output the references
+        # # output_smt += "(declare-fun " + sm.getAlias() + "() (_ BitVec " + str(sm.getBitSize()) + "))\n"
+        # # output_smt += str(ctx.getSymbolicExpression(sm.getId())) + "\n"
+        # # # update offset to stack
+        # # curr_offset += size
+
+        # size = CPUSIZE.DWORD
+        # sm = ctx.symbolizeMemory(MemoryAccess(rbp_main - curr_offset - size, size), "prog_" + str(prog_id) + "_" + "mo_" + hex(1 * size))
+        # sym_mem.append("prog_" + str(prog_id) + "_ref!" + str(sm.getId()))
+        # # Declare sym var then output the references
+        # output_smt += "(declare-fun " + sm.getAlias() + "() (_ BitVec " + str(sm.getBitSize()) + "))\n"
+        # output_smt += str(ctx.getSymbolicExpression(sm.getId())) + "\n"
+        # # update offset to stack
+        # curr_offset += size
+
+        # output_smt += ";;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;\n\n"
+
+        # return output_smt, sym_mem
+
         sm = ctx.symbolizeMemory(MemoryAccess(self.base_stack, CPUSIZE.BYTE), "prog_" + str(prog_id) + "_" + "mo_" + hex(0))
         sym_mem.append("prog_" + str(prog_id) + "_ref!" + str(sm.getId()))
         # Declare sym var then output the references
@@ -247,17 +317,48 @@ class EquivalenceTest():
     def gen_eq_condition(self):
         output_smt = ""
         output_smt += "(assert\n"
-        output_smt += "\t(not\n"
-        output_smt += "\t\t(and\n"
+        output_smt += "\t(and\n"
+        # output_smt += "\t\t(and\n"
         output_smt += "\t\t\t" + self.final_initial_conditions_ref + "\n"
-        output_smt += "\t\t\t(=\n"
+        output_smt += "\t\t\t(not (=\n"
         output_smt += "\t\t\t\t" + self.output_smt_result_0_ref + "\n"
         output_smt += "\t\t\t\t" + self.output_smt_result_1_ref + "\n"
-        output_smt += "\t\t\t)\n"
-        output_smt += "\t\t)\n"
+        output_smt += "\t\t\t))\n"
+        # output_smt += "\t\t)\n"
         output_smt += "\t)\n"
         output_smt += ")\n"
         output_smt += "(check-sat)\n"
+        # # output_smt += "(get-model)\n"
+
+        # output_smt = ""
+        # output_smt += "(assert\n"
+        # output_smt += "\t(and\n"
+        # # output_smt += "\t\t(and\n"
+        # output_smt += "\t\t\t" + self.final_initial_conditions_ref + "\n"
+        # output_smt += "\t\t\t(not (=\n"
+        # output_smt += "\t\t\t\t" + self.output_smt_result_0_ref + "\n"
+        # output_smt += "\t\t\t\t" + self.output_smt_result_1_ref + "\n"
+        # output_smt += "\t\t\t))\n"
+        # # output_smt += "\t\t)\n"
+        # output_smt += "\t)\n"
+        # output_smt += ")\n"
+        # output_smt += "(check-sat)\n"
+        # output_smt += "(get-model)\n"
+        
+        # output_smt = ""
+        # output_smt += "(assert\n"
+        # output_smt += "\t(not\n"
+        # output_smt += "\t\t(and\n"
+        # output_smt += "\t\t\t" + self.final_initial_conditions_ref + "\n"
+        # output_smt += "\t\t\t(=\n"
+        # output_smt += "\t\t\t\t" + self.output_smt_result_0_ref + "\n"
+        # output_smt += "\t\t\t\t" + self.output_smt_result_1_ref + "\n"
+        # output_smt += "\t\t\t)\n"
+        # output_smt += "\t\t)\n"
+        # output_smt += "\t)\n"
+        # output_smt += ")\n"
+        # output_smt += "(check-sat)\n"
+
         return output_smt
 
 
