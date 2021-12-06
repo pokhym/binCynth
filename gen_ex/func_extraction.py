@@ -286,6 +286,9 @@ class FunctionExtractor:
         """
             Main loop to do multiple runs of Triton
         """
+        self.next_call_site = False
+        self.next_call_site_address = None
+        self.i_count = 0 # instruction count
         # Set the architecture
         self.ctx = TritonContext(ARCH.X86_64)
         # Set a symbolic optimization mode
@@ -355,6 +358,7 @@ class FunctionExtractor:
 
     # Emulate the binary.
     def emulate(self, pc):
+        a = 0
         while pc:
             # Fetch opcode
             opcode = self.ctx.getConcreteMemoryAreaValue(pc, 16)
