@@ -18,7 +18,7 @@ CTX.setArchitecture(ARCH.X86_64)
 CTX.setMode(MODE.ALIGNED_MEMORY, True)
 
 
-class EquivalenceChecker():
+class EquivalenceTest():
     ctx_0 : TritonContext
     ctx_1 : TritonContext
     base_stack : int
@@ -325,66 +325,10 @@ class EquivalenceChecker():
         # fd = open(join(self.output_smt_path, self.smt_file_name_prefix + pathlib.Path(self.prog_path_1).resolve().stem + self.smt_file_name_suffix), "w")
         # fd.write(self.output_smt_1)
         # fd.close()
+        return abspath(join(self.output_smt_path, self.output_smt_name + self.smt_file_name_suffix))
 
 
 if __name__ == "__main__":
     # def __init__(self, num_iargs : int, prog_path_0 : str, prog_path_1 : str, output_smt_path : str):
-    ec = EquivalenceChecker(2, "/home/user/pysynth/equivalence/p1", "/home/user/pysynth/equivalence/p2", "/home/user/pysynth/equivalence", "eq")
-    ec.eq_check()
-    # sym_regs = []
-    # sym_mem = []
-    # # symbolize anything that isnt rbp and rsp
-    # OUTPUT_SMT += "; SYMBOLIC REGISTERS\n"
-    # for reg in CTX.getAllRegisters():
-    #     if reg.getName() != 'rbp' or reg.getName != 'rsp':
-    #         sr = CTX.symbolizeRegister(reg, reg.getName() + "_sym")
-    #         sym_regs.append(sr)
-    #         # Declare sym var then output the references
-    #         OUTPUT_SMT += "(declare-fun " + sr.getAlias() + "() (_ BitVec " + str(sr.getBitSize()) + "))\n"
-    #         OUTPUT_SMT += str(CTX.getSymbolicExpression(sr.getId())) + "\n"
-    # OUTPUT_SMT += ";;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;\n\n"
-    
-    # # symbolize memory around the stack
-    # OUTPUT_SMT += "; SYMBOLIC MEMROY\n"
-    # sm = CTX.symbolizeMemory(MemoryAccess(BASE_STACK, CPUSIZE.DWORD), "mo_" + hex(0))
-    # # Declare sym var then output the references
-    # OUTPUT_SMT += "(declare-fun " + sm.getAlias() + "() (_ BitVec " + str(sm.getBitSize()) + "))\n"
-    # OUTPUT_SMT += str(CTX.getSymbolicExpression(sm.getId())) + "\n"
-    # for i in range(1, BYTES_TO_SYMBOLIZE, 1):
-    #     mem_plus = MemoryAccess(BASE_STACK + i * CPUSIZE.DWORD, CPUSIZE.DWORD)
-    #     sm = CTX.symbolizeMemory(mem_plus, 'mp_' + hex(i * CPUSIZE.DWORD))
-    #     # Declare sym var then output the references
-    #     OUTPUT_SMT += "(declare-fun " + sm.getAlias() + "() (_ BitVec " + str(sm.getBitSize()) + "))\n"
-    #     OUTPUT_SMT += str(CTX.getSymbolicExpression(sm.getId())) + "\n"
-    #     sym_mem.append(sm)
-    #     mem_minus = MemoryAccess(BASE_STACK - i * CPUSIZE.DWORD, CPUSIZE.DWORD)
-    #     sm = CTX.symbolizeMemory(mem_minus, 'mm_' + hex(i * CPUSIZE.DWORD))
-    #     # Declare sym var then output the references
-    #     OUTPUT_SMT += "(declare-fun " + sm.getAlias() + "() (_ BitVec " + str(sm.getBitSize()) + "))\n"
-    #     OUTPUT_SMT += str(CTX.getSymbolicExpression(sm.getId())) + "\n"
-    #     sym_mem.append(sm)
-    # OUTPUT_SMT += ";;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;\n\n"
-
-    # # get binary
-    # binary = load_binary(CTX)
-
-    # # emulate 
-    # emulate(binary.get_symbol('main').value)
-
-    # # replace ref!0 with PROG_NAME_ref!0
-    # OUTPUT_SMT = OUTPUT_SMT.replace("ref!", "prog_" + str(PROGRAM_ID) + "_" + "ref!")
-
-    # se = CTX.getSymbolicExpressions()
-    # for k in sorted(se.keys(), reverse=True):
-    #     v = se[k]
-    #     print(v)
-    #     print("\t",v.getId(), v.getOrigin())
-    #     if(v.getOrigin().getName() == "rax" or v.getOrigin().getName() == "eax"):
-    #         OUTPUT_SMT += "(define-fun prog_" + str(PROGRAM_ID) + "_final_" + v.getOrigin().getName() + " () (_ BitVec " + str(v.getOrigin().getBitSize()) + ") " + "prog_" + str(PROGRAM_ID) + "!" + str(v.getId()) + ")"
-    #         break
-
-    # # output smt
-    # fd = open("/home/user/pysynth/equivalence/" + SMT_FILE_NAME, "w")
-    # fd.write(OUTPUT_SMT)
-    # fd.close()
-
+    ec = EquivalenceTest(2, "/home/user/pysynth/equivalence/p1", "/home/user/pysynth/equivalence/p2", "/home/user/pysynth/equivalence", "eq")
+    print(ec.eq_check())
