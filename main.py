@@ -1,9 +1,10 @@
 import sys
 from os.path import abspath, exists, isfile, join
-from os import listdir, chdir, getcwd
+from os import listdir, chdir, getcwd, remove
 import subprocess
 import re
 from typing import List
+import glob
 
 from gen_ex.execution_info import OUTPUT_REGISTERS
 
@@ -184,18 +185,26 @@ if __name__ == "__main__":
     assert(exists(abspath(COMPONENTS_HPP_PATH)))
     assert(exists(abspath(COMPONENTS_CPP_PATH)))
 
+    # recompile synth_engine
+    chdir(abspath(SYNTH_ENGINE_FOLDER))
+    ret = subprocess.run(["make"], capture_output=True)
+    if ret.returncode != 0:
+        print("Failed to compile synth_engine function")
+        exit(-1)
+    chdir(CURRENT_WORKING_DIRECTORY)
+
     # Call function extraction on main function input arguments and binary
-    fe = func_extraction.FunctionExtractor("/home/user/pysynth/tests/python/triton_int_only_example_1.txt", "/home/user/pysynth/tests/c/func_call")
+    fe = func_extraction.FunctionExtractor("/home/user/pysynth/tests/python/triton_int_only_example_1.txt", "/home/user/pysynth/tests/c/main_has_in_between")
     # execute binary and return the list of examples as file paths
     io_file_paths = fe.run()
 
     # for each example file run synth_engine
     for iofp in io_file_paths:
         # exec
-        ret = subprocess.run([SYNTH_ENGINE_EXECUTABLE_PATH, abspath(iofp), abspath(PARTIAL_OUTPUT_PATH)], capture_output=True)
+        ret = subprocess.run([SYNTH_ENGINE_EXECUTABLE_PATH, abspath(iofp), abspath(PARTIAL_OUTPUT_PATH)], capture_output=False)
         if ret.returncode != 0:
             print("Failed to synthesize.")
-            print(ret.stdout)
+            # print(ret.stdout)
             exit(-1)
         
         # obtain the synthesized cpp files
@@ -235,5 +244,14 @@ if __name__ == "__main__":
             exit(-1)
         chdir(CURRENT_WORKING_DIRECTORY)
 
-        a = 0
+        synthed_files = glob.glob("synthed_*")
+        try:
+            remove(abspath(iofp))
+        except:
+            print("Could not remove", iofp)
+        for fp in synthed_files:
+            try:
+                remove(abspath(fp))
+            except:
+                print("Could not remove", fp)
 

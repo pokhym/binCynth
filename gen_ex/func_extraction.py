@@ -391,6 +391,9 @@ class FunctionExtractor:
         key_by_call_depth = sorted(key_by_call_depth, key=lambda x: x[1], reverse=True)
         files_to_return = []
         for k_cd in key_by_call_depth:
+            # ignore main wrapper function
+            if k_cd[1] == 0:
+                continue
             while True:
                 curr_file_name = abspath("io_ex_" + str(count) + ".txt")
                 if not exists(curr_file_name):
