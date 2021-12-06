@@ -19,13 +19,27 @@
 (define-fun p2_ref!7 () (_ BitVec 64) (_ bv4102 64)) ; Program Counter - 0x1003: mov eax, dword ptr [rbp - 4]
 
 
+;(assert
+;    (not
+;        (=>
+;            (and
+;                (= p1_ref!0 p2_ref!0)
+;                (= p1_ref!1 p2_ref!1)
+;                (= p1_ref!2 p2_ref!2)
+;                (= p1_ref!3 p2_ref!3))
+;            (= p2_ref!6 p1_ref!8))))
+;(check-sat)
+
 (assert
     (not
-        (=>
+        ;(=>
             (and
                 (= p1_ref!0 p2_ref!0)
                 (= p1_ref!1 p2_ref!1)
                 (= p1_ref!2 p2_ref!2)
-                (= p1_ref!3 p2_ref!3))
-            (= p2_ref!6 p1_ref!8))))
-(check-sat)
+                (= p1_ref!3 p2_ref!3)
+                (= p2_ref!6 p1_ref!8)
+            )
+        ;)
+    )
+)
