@@ -97,7 +97,7 @@ class EquivalenceTest():
         for phdr in phdrs:
             size   = phdr.physical_size
             vaddr  = phdr.virtual_address
-            print('Loading 0x%06x - 0x%06x' %(vaddr, vaddr+size))
+            # print('Loading 0x%06x - 0x%06x' %(vaddr, vaddr+size))
             ctx.setConcreteMemoryAreaValue(vaddr, phdr.content)
 
         return binary
@@ -119,28 +119,28 @@ class EquivalenceTest():
 
             # Process
             ctx.processing(instruction)
-            print(instruction)
-            #
+            # print(instruction)
+
             for expr in instruction.getSymbolicExpressions():
                 output_smt += str(expr) + "\n"
 
             if instruction.getType() == OPCODE.X86.CALL:
                 call_count += 1
-                print("CALL REACHED")
-                print("\tcall_count:", call_count)
-                print("\tret_count:", ret_count)
+                # print("CALL REACHED")
+                # print("\tcall_count:", call_count)
+                # print("\tret_count:", ret_count)
             elif instruction.getType() == OPCODE.X86.RET:
                 ret_count += 1
-                print("RET REACHED")
-                print("\tcall_count:", call_count)
-                print("\tret_count:", ret_count)
+                # print("RET REACHED")
+                # print("\tcall_count:", call_count)
+                # print("\tret_count:", ret_count)
             elif instruction.getType() == OPCODE.X86.HLT:
                 break
 
             if call_count + 1 == ret_count:
-                print("TERMINATE")
-                print("\tcall_count:", call_count)
-                print("\tret_count:", ret_count)
+                # print("TERMINATE")
+                # print("\tcall_count:", call_count)
+                # print("\tret_count:", ret_count)
                 break
             # Next
             pc = ctx.getConcreteRegisterValue(ctx.registers.rip)
@@ -216,8 +216,8 @@ class EquivalenceTest():
         output_smt = "; FINAL RAX\n"
         for k in sorted(se.keys(), reverse=True):
             v = se[k]
-            print(v)
-            print("\t",v.getId(), v.getOrigin())
+            # print(v)
+            # print("\t",v.getId(), v.getOrigin())
             if(v.getOrigin().getName() == "rax" or v.getOrigin().getName() == "eax"):
                 output_smt += "(define-fun prog_" + str(prog_id) + "_final_" + v.getOrigin().getName() + " () (_ BitVec " + str(v.getOrigin().getBitSize()) + ") " + "prog_" + str(prog_id) + "_ref!" + str(v.getId()) + ")\n"
                 if prog_id == 0:
@@ -248,7 +248,7 @@ class EquivalenceTest():
         output_smt = ""
         output_smt += "(assert\n"
         output_smt += "\t(not\n"
-        output_smt += "\t\t(=>\n"
+        output_smt += "\t\t(and\n"
         output_smt += "\t\t\t" + self.final_initial_conditions_ref + "\n"
         output_smt += "\t\t\t(=\n"
         output_smt += "\t\t\t\t" + self.output_smt_result_0_ref + "\n"
@@ -329,6 +329,24 @@ class EquivalenceTest():
 
 
 if __name__ == "__main__":
-    # def __init__(self, num_iargs : int, prog_path_0 : str, prog_path_1 : str, output_smt_path : str):
-    ec = EquivalenceTest(2, "/home/user/pysynth/equivalence/p1", "/home/user/pysynth/equivalence/p2", "/home/user/pysynth/equivalence", "eq")
-    print(ec.eq_check())
+    import subprocess
+
+    # This is Equivalent: Returns unsat
+    ec0 = EquivalenceTest(2, "/home/user/pysynth/equivalence/p1", "/home/user/pysynth/equivalence/p2", "/home/user/pysynth/equivalence", "eq")
+    dir0 = ec0.eq_check()
+    subprocess.run(["z3", "-smt2", dir0], capture_output=False)
+    
+    # This is Equivalent: Returns unsat
+    ec1 = EquivalenceTest(2, "/home/user/pysynth/equivalence/p1_1", "/home/user/pysynth/equivalence/p2_1", "/home/user/pysynth/equivalence", "eq_1")
+    dir1 = ec1.eq_check()
+    subprocess.run(["z3", "-smt2", dir1], capture_output=False)
+    
+    # This is Equivalent: Returns unsat
+    ec2 = EquivalenceTest(2, "/home/user/pysynth/equivalence/p1_2", "/home/user/pysynth/equivalence/p2_2", "/home/user/pysynth/equivalence", "eq_2")
+    dir2 = ec2.eq_check()
+    subprocess.run(["z3", "-smt2", dir2], capture_output=False)
+    
+    # This is not Equivalent: Returns sat
+    ec3 = EquivalenceTest(2, "/home/user/pysynth/equivalence/p1_3", "/home/user/pysynth/equivalence/p2_3", "/home/user/pysynth/equivalence", "eq_3")
+    dir3 = ec3.eq_check()
+    subprocess.run(["z3", "-smt2", dir3], capture_output=False)
