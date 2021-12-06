@@ -19,6 +19,12 @@ class InstructionType(Enum):
 class InstructionInfo():
     # Which specific instruction is being executed
     eip : int
+    # Whether this is the first instruction after a call
+    first_instr : bool
+    # the address of the instruction
+    i_addr : int
+    # the ith instruction in the program
+    i_count : int
     # An enum identifier for the type of instruction used to determine
     # whether we are leaving/entering a function
     inst_type : InstructionType
@@ -39,9 +45,12 @@ class InstructionInfo():
     # return values
     return_regs : Dict[str, int]
 
-    def __init__(self, eip : int, inst_type : InstructionType, r_regs : Dict[str, int], w_regs : Dict[str, int], \
+    def __init__(self, eip : int, first_instr : bool, i_addr : int, i_count : int, inst_type : InstructionType, r_regs : Dict[str, int], w_regs : Dict[str, int], \
                 r_addrs : Dict[int, Tuple[int, int]], w_addrs : Dict[int, Tuple[int, int]], smt : List[str], opcode : bytes):
         self.eip = eip
+        self.first_instr = first_instr
+        self.i_addr = i_addr
+        self.i_count = i_count
         self.inst_type = inst_type
         self.r_regs = r_regs
         self.w_regs = w_regs
@@ -67,15 +76,17 @@ class FunctionInfo():
     inital_registers : List[Tuple[str, int]]
     final_registers : List[Tuple[str, int]]
 
-    # hash of ii.bytes to determine a function identifier
-    hash_id : bytes
+    identifier : int # first instruction in the function
 
     def __init__(self, ii : List[InstructionInfo], call_depth : int):
         self.ii = ii
         self.call_depth = call_depth
         self.i_args = {}
         self.o_args = {}
-        self.hash_id = None
+        # first_instr must be true if call_depth > 0
+        if call_depth > 0:
+            assert(ii[0].first_instr == True)
+        self.identifier = ii[0].i_addr
 
     def determine_input_arguments(self):
         """
@@ -139,13 +150,6 @@ class FunctionInfo():
                 for _or in o_reg:
                     self.o_args.update({_or : ret_instruction.return_regs[_or]})
                     regs_not_yet_used.remove(_or)
-    
-    def calc_hash_id(self):
-        m = hashlib.sha256()
-
-        for ii in self.ii:
-            m.update(ii.opcode)
-        self.hash_id = m.digest()
             
     
 class ExecutionInfo():
@@ -153,7 +157,10 @@ class ExecutionInfo():
     # functions are stored in the reverse order they are called
     # index 0 will be the function that is called last
     # index len(fi) - 1 will be main
-    fi : List[FunctionInfo]
+
+    # key: int call depth
+    # value: List[FunctionInfo] at that call depth
+    fi : Dict[int, List[FunctionInfo]]
 
     # func_0 represents the top level call to the main function
     func_0_init_regs : Dict[str, int]
@@ -161,7 +168,7 @@ class ExecutionInfo():
 
     def __init__(self):
         self.ii = []
-        self.fi = []
+        self.fi = {}
         self.func_0_init_regs = {}
 
     def set_init_regs(self, ctx : TritonContext):    
@@ -180,16 +187,27 @@ class ExecutionInfo():
         ret_count = 0
         ret_idx = []
         parsed = []
+
+        f_start = {}
+        f_end = {}
         # first instruction always belongs to the first function
         call_idx.append((0, call_depth))
+        f_start.update({0 : [(0,0)]})
         for i in range(len(self.ii)):
             if self.ii[i].inst_type == InstructionType.CALL_INST:
                 call_count += 1
                 call_depth += 1
-                call_idx.append((i, call_depth))
+                # next instruction after a call is a new function
+                call_idx.append((i + 1, call_depth))
+                if call_depth not in f_start.keys():
+                    f_start.update({call_depth : []})
+                f_start[call_depth].append((i + 1, call_depth))
             elif self.ii[i].inst_type == InstructionType.RET_INST:
                 ret_count += 1
                 ret_idx.append((i, call_depth))
+                if call_depth not in f_end.keys():
+                    f_end.update({call_depth : []})
+                f_end[call_depth].append((i, call_depth))
                 call_depth += -1
             parsed.append(False)
         # reverse ret_idx to match call_idx
@@ -197,19 +215,33 @@ class ExecutionInfo():
         # assert(call_count == ret_count)
         assert(len(call_idx) == len(ret_idx))
 
-        for f_count in range(len(call_idx) - 1, -1, -1):
-            f_insns = []
-            f_call_depth = call_idx[f_count][1]
-            for i in range(call_idx[f_count][0], ret_idx[f_count][0] + 1):
-                if parsed[i] == False:
-                    f_insns.append(self.ii[i])
-                    parsed[i] = True
-            f_info = FunctionInfo(f_insns, f_call_depth)
-            self.fi.append(f_info)
+        # for reverse ordering of call depth
+        for cd in sorted(f_start.keys(), reverse=True):
+            print("cd", cd)
+            # for each function at that call depth
+            for idx in range(len(f_start[cd])):
+                s = f_start[cd][idx]
+                e = f_end[cd][idx]
+                assert(s[1] == e[1]) # start and end must be same call depth
+                print("se", (hex(s[0]), s[1]), (hex(e[0]), e[1]))
+                f_insns = []
+                for ii_idx in range(s[0], e[0] + 1, 1):
+                    if parsed[ii_idx] == False:
+                        f_insns.append(self.ii[ii_idx])
+                        parsed[ii_idx] = True
+                f_info = FunctionInfo(f_insns, s[1]) # s[1] is call depth
+                if s[1] not in self.fi.keys():
+                    self.fi.update({s[1] : []})
+                self.fi[s[1]].append(f_info)
+        
+        for k in self.fi.keys():
+            print("###", k, "###")
+            for v in self.fi[k]:
+                for ii in v.ii:
+                    print(ii.i_count, end=" : ")
+                print()
+            print("######")
 
-        for fi in self.fi:
-            print(len(fi.ii))
-    
     def extract_function_input_output(self):
         """
             https://en.wikipedia.org/wiki/X86_calling_conventions
@@ -236,16 +268,13 @@ class ExecutionInfo():
 
             TODO: Currently only handling RAX
         """
-        for fi in self.fi:
-            print(fi)
-            fi.determine_input_arguments()
-            print(fi.i_args)
-            fi.determine_output_arguments()
-            print(fi.o_args)
-    
-    def calculate_fi_hex_ids(self):
-        for fi in self.fi:
-            fi.calc_hash_id()
+        for cd in self.fi.keys():
+            for fi in self.fi[cd]:
+                print(hex(fi.identifier))
+                fi.determine_input_arguments()
+                print(fi.i_args)
+                fi.determine_output_arguments()
+                print(fi.o_args)
 
 
     def create_init_smt(self):

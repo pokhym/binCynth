@@ -13,7 +13,8 @@ from execution_info import ExecutionInfo, InstructionInfo, InstructionType
 
 # Script options
 # TARGET = "/home/user/pysynth/tests/c/empty_main"
-TARGET = "/home/user/pysynth/tests/c/func_call"
+# TARGET = "/home/user/pysynth/tests/c/func_call"
+TARGET = "/home/user/pysynth/tests/c/main_has_in_between"
 INPUT_EXAMPLES = "/home/user/pysynth/tests/python/triton_int_only_example_1.txt"
 
 # Memory mapping
@@ -29,6 +30,9 @@ class FunctionExtractor:
     main_stack_offset : int
     execution_info : ExecutionInfo
     examples : List[str]
+    next_call_site : bool # Next instruction is a call
+    next_call_site_address : int # Address of the next call
+    i_count : int 
 
     def __init__(self, path_to_input_examples : str, path_to_binary : str):
         self.path_to_input_examples = path_to_input_examples
@@ -44,9 +48,13 @@ class FunctionExtractor:
         # Define a stack
         self.ctx.setConcreteRegisterValue(self.ctx.registers.rbp, BASE_STACK)
         self.ctx.setConcreteRegisterValue(self.ctx.registers.rsp, BASE_STACK)
-        self.main_stack_offset = 8
+        self.main_stack_offset = CPUSIZE.QWORD
         self.execution_info = ExecutionInfo()
         self.examples = self.parse_examples()
+        self.next_call_site = False
+        self.next_call_site_address = None
+
+        self.i_count = 0 # instruction count
 
     def check_type(self, type_val : Tuple[str, str]):
         if type_val[0] == "int32":
@@ -56,17 +64,38 @@ class FunctionExtractor:
             exit(-1)
         
     def update_io_examples(self, input_example):
-        for fi in self.execution_info.fi:
-            if (fi.hash_id, fi.call_depth) not in self.io_examples.keys():
-                self.io_examples.update({(fi.hash_id, fi.call_depth) : IOExample()})
+        # determine the max call depth of each unique call
+        identifier_to_call_depth = {}
+        for cd in sorted(self.execution_info.fi.keys(), reverse=True):
+            for fi in self.execution_info.fi[cd]:
+                if fi.identifier not in identifier_to_call_depth.keys():
+                    identifier_to_call_depth.update({fi.identifier : fi.call_depth})
+                elif fi.identifier in identifier_to_call_depth.keys():
+                    if identifier_to_call_depth[fi.identifier] < fi.call_depth:
+                        identifier_to_call_depth[fi.identifier] = fi.call_depth
+        
+        # update each FunctionInfo to reflect its max call depth
+        for cd in sorted(self.execution_info.fi.keys(), reverse=True):
+            for fi in self.execution_info.fi[cd]:
+                fi.call_depth = identifier_to_call_depth[fi.identifier]
+
+        # flatten all FunctionInfo into a list
+        fi_list = []
+        for cd in sorted(self.execution_info.fi.keys(), reverse=True):
+            for fi in self.execution_info.fi[cd]:
+                fi_list.append(fi)
+            
+        for fi in fi_list:
+            if (fi.identifier, fi.call_depth) not in self.io_examples.keys():
+                self.io_examples.update({(fi.identifier, fi.call_depth) : IOExample()})
             # if this is the init function call, we need to add the original input
             if fi.call_depth == 0:
-                self.io_examples[(fi.hash_id, fi.call_depth)].add_func0_iargs(input_example)
+                self.io_examples[(fi.identifier, fi.call_depth)].add_func0_iargs(input_example)
             else:
-                self.io_examples[(fi.hash_id, fi.call_depth)].add_iargs(fi.i_args)
-            self.io_examples[(fi.hash_id, fi.call_depth)].add_oargs(fi.o_args)
+                self.io_examples[(fi.identifier, fi.call_depth)].add_iargs(fi.i_args)
+            self.io_examples[(fi.identifier, fi.call_depth)].add_oargs(fi.o_args)
         
-    def load_binary(self):
+    def load_binary(self, ctx):
         import lief
 
         # Map the binary into the memory
@@ -76,7 +105,7 @@ class FunctionExtractor:
             size   = phdr.physical_size
             vaddr  = phdr.virtual_address
             print('Loading 0x%06x - 0x%06x' %(vaddr, vaddr+size))
-            self.ctx.setConcreteMemoryAreaValue(vaddr, phdr.content)
+            ctx.setConcreteMemoryAreaValue(vaddr, phdr.content)
 
         return binary
 
@@ -94,7 +123,11 @@ class FunctionExtractor:
                 assert(len(buf) % 2 == 0)
                 # for i in range(0, len(buf), 2):
                 #     print(i, i + 1)
-                ex = [self.check_type(buf)]
+                ex = []
+                for i in range(0, len(buf), 2):
+                    ex.append(self.check_type((buf[i], buf[i + 1])))
+                    
+                # ex = [self.check_type(buf)]
                 exs.append(ex)
             fd.close()
         return exs
@@ -132,7 +165,8 @@ class FunctionExtractor:
                 The written and read value will be the same
                 To solve this pass the value before processing (we can check who reads/writes)
         """
-        print(instruction)
+        print(instruction, "|", self.i_count)
+        
         eip = instruction.getAddress()
         inst_type : InstructionType
         return_regs : Dict[str, int]
@@ -167,7 +201,7 @@ class FunctionExtractor:
             w_regs.update({reg_name_val[0] : reg_name_val[1]})
             print(reg_name_val[0] + "," + hex(reg_name_val[1]), end="|")
         print()
-        print("\t\Written Addresses:", end="")
+        print("\t\tWritten Addresses:", end="")
         for w_addr in instruction.getStoreAccess():
             addr_val = (w_addr[0].getAddress(), self.get_memory_value(w_addr[0]))
             w_addrs.update({addr_val[0] : addr_val[1]})
@@ -178,8 +212,13 @@ class FunctionExtractor:
             smt.append((expression.getOrigin(), expression))
             # print(expression.getOrigin())
         
-        # ''.join(r'\x'+hex(letter)[2:] for letter in instruction.getOpcode())
-        curr_ii = InstructionInfo(eip, inst_type, r_regs, w_regs, r_addrs, w_addrs, smt, instruction.getOpcode())
+        # special case for the main, where it is the call site at the current address
+        if self.i_count == 0:
+            curr_ii = InstructionInfo(eip, True, instruction.getAddress(), self.i_count, inst_type, r_regs, w_regs, r_addrs, w_addrs, smt, instruction.getOpcode())
+        # otherwise normal case
+        else:
+            curr_ii = InstructionInfo(eip, self.next_call_site, self.next_call_site_address, self.i_count, inst_type, r_regs, w_regs, r_addrs, w_addrs, smt, instruction.getOpcode())
+        
         # if ret add the return registers
         if curr_ii.inst_type == InstructionType.RET_INST:
             for _rr in curr_ii.return_regs.keys():
@@ -187,6 +226,61 @@ class FunctionExtractor:
                     if r.getName() == _rr:
                         curr_ii.return_regs.update({_rr : self.ctx.getConcreteRegisterValue(r)})
         self.execution_info.ii.append(curr_ii)
+
+        if "call" in str(instruction):
+            call_operands = instruction.getOperands()
+            assert(len(call_operands) == 1)
+            self.next_call_site = True
+            self.next_call_site_address = call_operands[0].getValue()
+            print("########### CALL ###########")
+        elif "ret" in str(instruction):
+            self.next_call_site = False
+            self.next_call_site_address = None
+            print("########### RET ###########")
+        else:
+            self.next_call_site = False
+            self.next_call_site_address = None
+        
+        self.i_count += 1
+
+    def determine_stack_size(self):
+        ctx = TritonContext(ARCH.X86_64)
+        ctx.setMode(MODE.ALIGNED_MEMORY, True)
+        for reg in ctx.getAllRegisters():
+            ctx.setConcreteRegisterValue(reg, 0)
+        ctx.setConcreteRegisterValue(ctx.registers.rbp, BASE_STACK)
+        ctx.setConcreteRegisterValue(ctx.registers.rsp, BASE_STACK)
+        binary = self.load_binary(ctx)
+
+        pc = binary.get_symbol('main').value
+        instruction_count = 0
+        while pc and instruction_count < 4:
+            instruction_count += 1
+            # Fetch opcode
+            opcode = ctx.getConcreteMemoryAreaValue(pc, 16)
+
+            # Create the Triton instruction
+            instruction = Instruction()
+            instruction.setOpcode(opcode)
+            instruction.setAddress(pc)
+
+            # Process
+            ctx.processing(instruction)
+            # dump_instruction_accesses(instruction)
+            # print(instruction)
+
+            if instruction.getType() == OPCODE.X86.HLT:
+                break
+
+            # Next
+            pc = ctx.getConcreteRegisterValue(ctx.registers.rip)
+
+        assert("sub" in str(instruction))
+        assert("rsp" == instruction.getOperands()[0].getName())
+
+        # sub rsp, 0x20 <-- instruction.getOperands()[1].getValue() is 0x20
+        # ctx.getConcreteRegisterValue(ctx.getRegister('rsp')) <-- gets the rsp value
+        return (ctx.getConcreteRegisterValue(ctx.getRegister('rbp')), instruction.getOperands()[1].getValue(), ctx.getConcreteRegisterValue(ctx.getRegister('rsp')))
     
     def run_triton(self, input_example):
         """
@@ -206,21 +300,33 @@ class FunctionExtractor:
         # clear execution info
         self.execution_info = ExecutionInfo()
         # Load the binary
-        binary = self.load_binary()
+        binary = self.load_binary(self.ctx)
 
         # set init register state in ExecutionInfo
         self.execution_info.set_init_regs(self.ctx)
 
-        # set initial stack variables
-        curr_offset = self.main_stack_offset # 8
-        for arg in input_example:
-            # print(arg)
-            rbp = self.ctx.getConcreteRegisterValue(self.ctx.registers.rbp)
-            # print(hex(rbp - curr_offset - arg[0]))
-            mem = MemoryAccess(rbp - curr_offset - arg[0], arg[0])
+        """
+            The first instructions to main
+                endbr64
+                push rbp        ; save rbp, also updates rbp - 8 (because rbp not ebp)
+                mov rbp, rsp    ; rbp is now top of stack
+                sub rsp, X      ; X is the space on the stack for local variables
+        """
+        rbp_main, rsp_main_sub, rsp_main = self.determine_stack_size()
+        print(hex(rbp_main), hex(rsp_main_sub), hex(rsp_main))
+        curr_offset = 0
+        for arg_idx in range(len(input_example) - 1, -1, -1):
+            arg = input_example[arg_idx]
+            size = None
+            if arg[0] == 4:
+                size = CPUSIZE.DWORD
+            else:
+                exit(-1)
+            mem = MemoryAccess(rbp_main - curr_offset - size, size)
+            print("Modifying:", hex(rbp_main - curr_offset - size), "with", arg[1])
             self.ctx.setConcreteMemoryValue(mem, arg[1])
             # update offset to stack
-            curr_offset += arg[0]
+            curr_offset += size
 
         # TODO: Set initial memory if we need to
 
@@ -242,8 +348,6 @@ class FunctionExtractor:
         print("Processing ExecutionInfo...")
         print("Splitting functions...")
         self.execution_info.split_function()
-        print("Calculating function identifiers...")
-        self.execution_info.calculate_fi_hex_ids()
         print("Processing function input/output per function...")
         self.execution_info.extract_function_input_output()
         print("Updating final IO examples...")
