@@ -1,18 +1,23 @@
-from triton import TritonContext, Instruction, ARCH, CPUSIZE, OPCODE
+from os import chdir
+import sys
+sys.path.append("/usr/lib/python3.8/site-packages")
+from triton import TritonContext, Instruction, ARCH, CPUSIZE, OPCODE, MemoryAccess
+from typing import Tuple
 import lief
 
 import subprocess
 
 BASE_STACK = 0x9fffffff
 
-def freshCx() -> TritonContext:
+def freshCx(prefix: str) -> TritonContext:
     # Create context for x86
     cx = TritonContext(ARCH.X86_64)
 
     # Symbolic registers
     for reg in cx.getAllRegisters():
-        cx.setConcreteRegisterValue(reg, 0)
-
+        if reg.getName() != "rbp" and reg.getName() != "rsp" and reg.getName() != "ebp" and reg.getName() != "esp" and reg.getName() != "eip" and reg.getName() != "rip":
+            cx.symbolizeRegister(reg, f"{prefix}_{reg.getName()}")
+        #cx.setConcreteRegisterValue(reg, 0) 
     # Defining a stack
     cx.setConcreteRegisterValue(cx.registers.rbp, BASE_STACK) # base pointer
     cx.setConcreteRegisterValue(cx.registers.rsp, BASE_STACK) # stack pointer
@@ -24,14 +29,14 @@ def gcc(fname: str, bname = "a.out") -> int:
     ret = subprocess.run(["gcc", fname, "-o", bname])
     return ret.returncode
 
-def prefixZ3Def(prefix: str, z3Def: str): # -> (str, str)
+def prefixZ3Def(prefix: str, z3Def: str) -> Tuple[str, str]:
     '''
     Prefix the identifier defined in a Z3 define-fun with the given prefix
     Returns the edited input string, and the edited symbolic variable
     '''
-    l = z3Def.split(' ')
-    l[1] = prefix + "_" + l[1]
-    return ' '.join(l), l[1]
+    z3Def = z3Def.replace("ref!", f"{prefix}_ref!")
+    sym = z3Def.split(" ")[1]
+    return z3Def, sym
 
 def loadBinary(cx: TritonContext, path: str): # -> (TritonContext, Int)
     '''
@@ -48,11 +53,12 @@ def loadBinary(cx: TritonContext, path: str): # -> (TritonContext, Int)
     #return (cx, binary.entrypoint.value)
     return (cx, binary.get_symbol('main').value)
 
-def instructionsFrom(cx: TritonContext, pc: int): # -> [Instruction]
+def instructionsFrom(cx: TritonContext, pc: int, fname = str): # -> [Instruction]
     '''
     Get the list of instructions from a binary loaded into Triton
     '''
     ret = []
+    completed = 0
 
     while pc:
         # Get opcode at current pc
@@ -67,6 +73,7 @@ def instructionsFrom(cx: TritonContext, pc: int): # -> [Instruction]
         cx.processing(instruction)
         
         #print(instruction)
+        #if str(instruction).find("dword ptr") != -1:
 
         # Put the instruction in our list
         ret.append(instruction)
@@ -74,9 +81,14 @@ def instructionsFrom(cx: TritonContext, pc: int): # -> [Instruction]
         # End if halt is found
         if instruction.getType == OPCODE.X86.HLT:
             break
+        # arg1 = cx.getSymbolicMemoryValue(BASE_STACK - CPUSIZE.DWORD)
+        # arg2 = cx.getSymbolicMemoryValue(BASE_STACK - 2 * CPUSIZE.DWORD)
+
 
         pc = cx.getConcreteRegisterValue(cx.registers.rip)
+        completed += 1
 
+    #print("#########")
     return ret
 
 def getNameIfRegister(x) -> str:
@@ -85,10 +97,20 @@ def getNameIfRegister(x) -> str:
     except AttributeError:
         return "MEM"
 
-def toZ3(fname: str, bname: str, prefix: str): # -> (List[str], str, sym, sym)
+def isSubstring(s1: str, s2: str) -> bool:
+    return s1.find(s2) != -1
+
+def expressionIsMovForReg(e, reg: str) -> bool:
+    s = str(e)
+    ret = isSubstring(s, "MOV operation") and isSubstring(s, f"mov {reg}")
+    #print(ret, s)
+    return ret
+
+def toZ3(fname: str, bname: str, prefix: str): # -> (List[str], str, sym)
     '''
     Returns a list of SMT definitions representing the execution of a file,
-    and the last symbolic variable associated with the return register rax
+    the last symbolic variable associated with the return register rax,
+    and the symbolic variables representing the arguments
     '''
     status = gcc(fname, bname)
 
@@ -98,20 +120,23 @@ def toZ3(fname: str, bname: str, prefix: str): # -> (List[str], str, sym, sym)
         exit()
 
     # Load the binary and get the Triton context and program counter
-    cx, pc = loadBinary(freshCx(), bname)
+    cx, pc = loadBinary(freshCx(prefix), bname)
 
-    # Get the symbolic args
-    bp = cx.getConcreteRegisterValue(cx.registers.rbp)
-    arg1 = cx.getSymbolicMemory(bp - CPUSIZE.WORD)
-    arg2 = cx.getSymbolicMemory(bp - 2 * CPUSIZE.WORD)
-
-    # Get the instructions 
-    instructions = instructionsFrom(cx, pc)
+    # Get the instructions and the symbolic memory for the args
+    instructions = instructionsFrom(cx, pc, fname)
 
     # Get the Z3 definitions from instructions
     z3Defs = []
     raxSym = "!!!"
+    arg1Sym = "!!!"
+    arg2Sym = "!!!"
+    functionCalled = False
     for inst in instructions:
+        # Check if the first function call has occurred
+        if not functionCalled and isSubstring(str(inst), "call"):
+            #print("Function called")
+            functionCalled = True
+
         for expression in inst.getSymbolicExpressions():
             z3Def, sym = prefixZ3Def(prefix, str(expression))
             z3Defs.append(z3Def)
@@ -122,12 +147,32 @@ def toZ3(fname: str, bname: str, prefix: str): # -> (List[str], str, sym, sym)
             if name == "rax":
                 raxSym = sym
 
+            # If the first function hasn't been called, then we may need to create a symbolic variable to refer to arg1
+            if not functionCalled and expressionIsMovForReg(expression, "edi"):
+                #print("Found arg")
+                arg1Sym = f"{prefix}_arg1"
+                z3Defs.append(f"(define-fun {arg1Sym} () (_ BitVec 64) {sym})")
+
+            if not functionCalled and expressionIsMovForReg(expression, "esi"):
+                arg2Sym = f"{prefix}_arg2"
+                z3Defs.append(f"(define-fun {arg2Sym} () (_ BitVec 64) {sym})")
+
     # If the function doesn't have anything associated with the rax register
     if raxSym == "!!!":
         print("No symbolic variable for rax!")
         exit()
 
-    return z3Defs, raxSym, arg1, arg2
+    # If no argument 1 has been found
+    if arg1Sym == "!!!":
+        print("No symbolic variable for arg1!")
+        exit()
+
+    # If no argument 1 has been found
+    if arg2Sym == "!!!":
+        print("No symbolic variable for arg2!")
+#        exit()
+
+    return z3Defs, raxSym, arg1Sym, arg2Sym
 
 def areEquivalentZ3(fname1: str, retSize1: int, 
                     fname2: str, retSize2: int,
@@ -145,17 +190,19 @@ def areEquivalentZ3(fname1: str, retSize1: int,
         # TODO: Create stack
 
         # Equality of arguments
-        z3Arg1 = f"(assert (= {arg1Sym1} {arg1Sym2}))"
-        z3Arg2 = f"(assert (= {arg2Sym1} {arg2Sym2}))"
+        z3Arg1Eq = f"(assert (= {arg1Sym1} {arg2Sym1}))"
+        z3Arg2Eq = f"(assert (= {arg1Sym2} {arg2Sym2}))"
 
         # Equivalence check -- MAY need to make this an implication, premised on equality of initial value of eax
         z3Eq = f"(assert (not (= {eaxSym1} {eaxSym2})))"
 
-        return [z3Arg1, z3Arg2] + z3Defs1 + z3Defs2 + [z3Eq]
-
+        return z3Defs1 + z3Defs2 + [z3Arg1Eq, z3Arg2Eq, z3Eq, "(check-sat)"]
 
 if __name__ == "__main__":
-    xs = areEquivalentZ3("a.c", 1, "b.c", 1)
+    # chdir("equivalence")
+    file1 = input()
+    file2 = input()
+    xs = areEquivalentZ3(file1, 1, file2, 1)
     for x in xs:
         print(x)
 
