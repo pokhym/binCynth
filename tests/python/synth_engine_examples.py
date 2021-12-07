@@ -10,7 +10,7 @@ def example1():
         out:
             ret = a * b + b
     """
-    with open("example1.txt", "w") as fd:
+    with open("../example1.txt", "w") as fd:
         for i in range(NUM_EXAMPLES):
             a = random.randint(0, 10)
             b = random.randint(0, 10)
@@ -26,7 +26,7 @@ def example2():
         out:
             ret = a - 15
     """
-    with open("example2.txt", "w") as fd:
+    with open("../example2.txt", "w") as fd:
         for i in range(NUM_EXAMPLES):
             a = random.randint(0, 10)
             ret = a - 15
@@ -42,7 +42,7 @@ def example3():
         out:
             ret = 2 * (a + 1) + b
     """
-    with open("example3.txt", "w") as fd:
+    with open("../example3.txt", "w") as fd:
         for i in range(NUM_EXAMPLES):
             a = random.randint(0, 10)
             b = random.randint(0, 10)
@@ -58,7 +58,7 @@ def example4():
         out:
             ret = a - a + 1
     """
-    with open("example4.txt", "w") as fd:
+    with open("../example4.txt", "w") as fd:
         for i in range(NUM_EXAMPLES):
             a = random.randint(0, 10)
             ret = a - a + 1
@@ -73,7 +73,7 @@ def example5():
         out:
             ret = a + 1
     """
-    with open("example5.txt", "w") as fd:
+    with open("../example5.txt", "w") as fd:
         for i in range(NUM_EXAMPLES):
             a = random.randint(0, 10)
             ret = a + 1

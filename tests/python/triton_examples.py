@@ -44,5 +44,19 @@ def create_int_only(idx : int, num_input : int):
             fd.write("\n")
         fd.close()
 
-create_int_only(1, 1)
-        
+# create_int_only(1, 2)
+
+# i1 = 52
+# i2 = 86
+# o0 = 4 + i2
+# o1 = i1 + o0
+# o2 = o1 + i1
+# print(o2)
+
+# def modify_stuff2(a):
+#     return a + 1
+# def modify_stuff(a, b):
+#     a = modify_stuff2(a)
+#     return 2 * modify_stuff2(a) + b
+
+# print(modify_stuff(i1,i2))

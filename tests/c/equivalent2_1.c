@@ -1,5 +1,5 @@
 int f(int a, int b){
-    return a + b + b;
+    return a + a + b;
 }
 int main(){
     int a;
