@@ -191,7 +191,8 @@ void Engine::update_examples(std::vector<std::string> ex){
             io = IO_IN;
         if(ex[i + 1] == this->int_delimiter.c_str()){
             type = TYPE_INT;
-            val = (uint64_t)std::stoi(ex[i + 2].c_str());
+            val = (uint64_t)((int)std::stol(ex[i + 2].c_str()));
+            // val = (uint64_t)std::stoi(ex[i + 2].c_str());
         }
         // perform insert
         if(io == IO_IN){

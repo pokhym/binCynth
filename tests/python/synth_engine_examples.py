@@ -81,11 +81,29 @@ def example5():
             fd.write(out)
         fd.close()
 
+def example6():
+    """
+        in:
+            int a
+        out:
+            ret = 2 * a + b
+    """
+    with open("../example6.txt", "w") as fd:
+        for i in range(NUM_EXAMPLES):
+            a = random.randint(0, 10)
+            b = random.randint(0, 10)
+            ret = 2 * a + b - 3
+            # ret = a + b
+            out = "out,int32," + str(ret) + ",in,int32," + str(a) + ",in,int32," + str(b) + "\n" 
+            fd.write(out)
+        fd.close()
+
 if __name__ == "__main__":
     print("Generating examples...")
-    example1()
-    example2()
-    example3()
-    example4()
-    example5()
+    # example1()
+    # example2()
+    # example3()
+    # example4()
+    # example5()
+    example6()
     print("Finished generating examples...")

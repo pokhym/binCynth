@@ -15,7 +15,7 @@ int main(int argc, char *argv[]){
     partial_output_path = argv[2];
     // path_to_binary = "";
     // path_to_examples = "tests/example1.txt";
-    Engine *a = new Engine(path_to_examples, partial_output_path, 3);
+    Engine *a = new Engine(path_to_examples, partial_output_path, 5);
     std::cout << a->path_to_examples << std::endl;
     a->dump_exmaples();
     int ret = a->synth();

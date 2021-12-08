@@ -6,6 +6,7 @@ import re
 from typing import List
 import glob
 import logging
+import time
 
 from gen_ex.execution_info import OUTPUT_REGISTERS
 
@@ -43,6 +44,15 @@ def modify_components_hpp(synthed_c_name : str, synthed_c : List[str]):
     synthed_num_input = 0
     synthesized_func_only = ""
 
+    new_funcs_num = None
+    # calculate new function number
+    for l_idx in range(0, len(chpp)):
+        if "/*** END FUNCS_NUM ***/" in chpp[l_idx + 1]:
+            m = re.search(r"[0-9]+", chpp[l_idx])
+            new_funcs_num = int(m[0]) + 1
+            break
+    assert(new_funcs_num != None)
+
     # update FUNC_DEFINITION
     current_index = 0
     term = False
@@ -53,8 +63,10 @@ def modify_components_hpp(synthed_c_name : str, synthed_c : List[str]):
             # find the beginning of the function
             for sc_idx in range(len(synthed_c)):
                 if "{" in synthed_c[sc_idx] and synthed_c_name in synthed_c[sc_idx]:
+                    synthed_c_name = re.sub(r"synthed_[0-9]+", "synthed_" + str(new_funcs_num), synthed_c_name, 1)
                     bracket_idx = synthed_c[sc_idx].rfind("{")
                     func_def = synthed_c[sc_idx][:bracket_idx] + ";\n"
+                    func_def = re.sub(r"synthed_[0-9]+", "synthed_" + str(new_funcs_num), func_def, 1)
                     chpp.insert(l_idx, func_def)
                     term = True
                     current_index = l_idx
@@ -84,6 +96,11 @@ def modify_components_hpp(synthed_c_name : str, synthed_c : List[str]):
             chpp[l_idx] = "static const int FUNCS_NUM = " + str(new_funcs_num) + ";\n"
             term = True
             current_index = l_idx
+            match_func_name = re.findall(r"synthed_[0-9]+", synthesized_func_only)
+            assert(len(match_func_name) >= 1)
+            synthesized_func_only = re.sub(r"synthed_[0-9]+", "synthed_" + str(new_funcs_num), synthesized_func_only, 1)
+            # synthesized_func_only[0] = synthesized_func_only[0].replace(match_func_name[0], "synthed_" + str(new_funcs_num))
+            # synthesized_func_only = "".join(synthesized_func_only)
             break
 
     # update FUNC_PTR_TYPE_CAST
@@ -215,10 +232,6 @@ def get_function_length(synthed_c_name : str, synthed_c : List[str]):
 #     modify_components_cpp(func)
 
 if __name__ == "__main__":
-    assert(exists(abspath(SYNTH_ENGINE_EXECUTABLE_PATH)))
-    assert(exists(abspath(COMPONENTS_HPP_PATH)))
-    assert(exists(abspath(COMPONENTS_CPP_PATH)))
-
     logging.info("Enter path to input examples for black box target binary...")
     # /home/user/pysynth/tests/python/triton_int_only_example_1.txt
     bb_input_examples = input()
@@ -239,6 +252,10 @@ if __name__ == "__main__":
         exit(-1)
     chdir(CURRENT_WORKING_DIRECTORY)
 
+    assert(exists(abspath(SYNTH_ENGINE_EXECUTABLE_PATH)))
+    assert(exists(abspath(COMPONENTS_HPP_PATH)))
+    assert(exists(abspath(COMPONENTS_CPP_PATH)))
+
     # Call function extraction on main function input arguments and binary
     logging.info("Extracting functions from binary...")
     fe = func_extraction.FunctionExtractor(bb_input_examples, bb_binary, False)
@@ -248,7 +265,7 @@ if __name__ == "__main__":
     # for each example file run synth_engine
     for iofp in io_file_paths:
         # exec
-        logging.info("Synthesizing for ", iofp, "...")
+        logging.info("Synthesizing for " + iofp + "...")
         ret = subprocess.run([SYNTH_ENGINE_EXECUTABLE_PATH, abspath(iofp), abspath(PARTIAL_OUTPUT_PATH)], capture_output=False)
         if ret.returncode != 0:
             logging.info("Failed to synthesize.")
@@ -266,6 +283,7 @@ if __name__ == "__main__":
             if ret.returncode != 0:
                 logging.info("Failed to compile synthesized function")
                 logging.info(sc)
+                logging.info(ret.stderr.decode())
                 exit(-1)
         
         # equivalence check
@@ -324,8 +342,9 @@ if __name__ == "__main__":
         chdir(abspath(SYNTH_ENGINE_FOLDER))
         ret = subprocess.run(["make"], capture_output=True)
         if ret.returncode != 0:
-            logging.info("Failed to compile synth_engine function")
-            logging.info(sc)
+            logging.info("Failed to compile synth_engine")
+            # logging.info(ret.stdout.decode())
+            logging.info(ret.stderr.decode())
             exit(-1)
         chdir(CURRENT_WORKING_DIRECTORY)
 
