@@ -285,7 +285,7 @@ def create_z3(output_z3_path, sym_var_reg_0, sym_var_mem_0, inst_sym_0_expr, fin
         fd.close()
     
 
-def run(binary_0_path, binary_1_path, output_z3_path):
+def equivalence_check_run(binary_0_path, binary_1_path, output_z3_path):
     # set up triton context
     ctx_0 = TritonContext()
     ctx_0.setArchitecture(ARCH.X86_64)
@@ -336,18 +336,18 @@ def run(binary_0_path, binary_1_path, output_z3_path):
 
 
 if __name__ == '__main__':
-    run("/home/user/pysynth/tests/c/equivalent1_1", "/home/user/pysynth/tests/c/equivalent2_1", "/home/user/pysynth/equivalence/out")
+    equivalence_check_run("/home/user/pysynth/tests/c/equivalent1_1", "/home/user/pysynth/tests/c/equivalent2_1", "/home/user/pysynth/equivalence/out")
     print("This should be unsat")
     subprocess.run(["z3", "-smt2", "/home/user/pysynth/equivalence/out"], capture_output=False)
     
-    run("/home/user/pysynth/tests/c/equivalent1_2", "/home/user/pysynth/tests/c/equivalent2_2", "/home/user/pysynth/equivalence/out")
+    equivalence_check_run("/home/user/pysynth/tests/c/equivalent1_2", "/home/user/pysynth/tests/c/equivalent2_2", "/home/user/pysynth/equivalence/out")
     print("This should be unsat")
     subprocess.run(["z3", "-smt2", "/home/user/pysynth/equivalence/out"], capture_output=False)
 
-    run("/home/user/pysynth/tests/c/different1_1", "/home/user/pysynth/tests/c/different2_1", "/home/user/pysynth/equivalence/out")
+    equivalence_check_run("/home/user/pysynth/tests/c/different1_1", "/home/user/pysynth/tests/c/different2_1", "/home/user/pysynth/equivalence/out")
     print("This should be sat")
     subprocess.run(["z3", "-smt2", "/home/user/pysynth/equivalence/out"], capture_output=False)
 
-    run("/home/user/pysynth/tests/c/different1_2", "/home/user/pysynth/tests/c/different2_2", "/home/user/pysynth/equivalence/out")
+    equivalence_check_run("/home/user/pysynth/tests/c/different1_2", "/home/user/pysynth/tests/c/different2_2", "/home/user/pysynth/equivalence/out")
     print("This should be sat")
     subprocess.run(["z3", "-smt2", "/home/user/pysynth/equivalence/out"], capture_output=False)

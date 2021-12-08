@@ -10,8 +10,10 @@ from gen_ex.execution_info import OUTPUT_REGISTERS
 
 sys.path.append("/usr/lib/python3.8/site-packages")
 sys.path.append(abspath("gen_ex"))
+sys.path.append(abspath("equivalence"))
 
 import func_extraction
+import equivalence_test
 
 CURRENT_WORKING_DIRECTORY = getcwd()
 SYNTH_ENGINE_FOLDER = "synth_engine"
@@ -21,6 +23,7 @@ PARITAL_OUTPUT_FOLDER_PATH = ""
 PARTIAL_SYNTHED_CPP = "synthed_"
 COMPONENTS_HPP_PATH = "synth_engine/components.hpp"
 COMPONENTS_CPP_PATH = "synth_engine/components.cpp"
+SMT_FILE_NAME = "out.smt2"
 
 def modify_components_hpp(synthed_c_name : str, synthed_c : List[str]):
     """
@@ -169,6 +172,39 @@ def modify_components_cpp(synth_c : str):
         fd.write(synth_c)
         fd.close()
 
+def get_function_length(synthed_c_name : str, synthed_c : List[str]):
+    # synthed function's number of inputs
+    synthed_num_input = 0
+    synthesized_func_only = ""
+
+    # update FUNC_DEFINITION
+    current_index = 0
+    term = False
+
+    # length of function
+    synthed_c_len  = 0
+    # find the beginning of the function
+    for sc_idx in range(len(synthed_c)):
+        if "{" in synthed_c[sc_idx] and synthed_c_name in synthed_c[sc_idx]:
+            bracket_idx = synthed_c[sc_idx].rfind("{")
+            func_def = synthed_c[sc_idx][:bracket_idx] + ";\n"
+            # find the number of input arguments
+            m = re.findall(r"\(.*\)", synthed_c[sc_idx])
+            assert(len(m)) == 1
+            synthed_num_input = m[0].count("in_")
+
+            # build the synthesized function
+            for sss in range(sc_idx, len(synthed_c)):
+                if "}\n" == synthed_c[sss]:
+                    synthesized_func_only += synthed_c[sss]
+                    break
+                synthesized_func_only += synthed_c[sss]
+                synthed_c_len += 1
+            synthesized_func_only = synthesized_func_only.replace("\n", "\\n")
+            synthesized_func_only = synthesized_func_only.replace("\t", "\\t")
+            break
+    return synthed_c_len
+    
 # with open("synthed_4.cpp", "r") as fd:
 #     chpp = []
 #     while True:
@@ -221,10 +257,43 @@ if __name__ == "__main__":
                 exit(-1)
         
         # TODO: equivalence check
+        executable_names : List[str] = []
+        for sc in synthed_c:
+            executable_names.append(join(CURRENT_WORKING_DIRECTORY, sc.replace(".cpp", "")))
+        assert(len(executable_names) == 2)
+        # Create SMT2 file for 
+        equivalence_test.equivalence_check_run(executable_names[0], executable_names[1], join(CURRENT_WORKING_DIRECTORY, SMT_FILE_NAME))
+        assert(exists(join(CURRENT_WORKING_DIRECTORY, SMT_FILE_NAME)))
+        # check equivalence by calling z3
+        ret = subprocess.run(["z3", "-smt2", join(CURRENT_WORKING_DIRECTORY, SMT_FILE_NAME)], capture_output=True)
+        # unsat means that both executables are equivalent
+        if "unsat" not in ret.stdout.decode():
+            print("Failed equivalence check of synthesized functions")
+            exit(-1)
+        
 
-        # NOTE: Currently assumeing that the first function is better
-        # add to components.hpp
-        with open(abspath(synthed_c[0]), "r") as fd:
+
+        # check the lengths of functions and choose the shiorter one
+        curr_min_length = 9999999999999999999
+        min_length_sc_idx = None
+        for sc_idx in range(len(synthed_c)):
+            with open(abspath(synthed_c[sc_idx]), "r") as fd:
+                synthed = []
+                while True:
+                    buf = fd.readline()
+                    if not buf:
+                        break
+                    synthed.append(buf)
+                fd.close()
+            sc_idx_len = get_function_length(synthed_c[sc_idx].replace(".cpp", ""), synthed)
+            if sc_idx_len < curr_min_length:
+                curr_min_length = sc_idx_len
+                min_length_sc_idx = sc_idx
+        assert(min_length_sc_idx != None)
+
+
+        # add to components.hpp and cpp
+        with open(abspath(synthed_c[min_length_sc_idx]), "r") as fd:
             synthed = []
             while True:
                 buf = fd.readline()
@@ -232,7 +301,7 @@ if __name__ == "__main__":
                     break
                 synthed.append(buf)
             fd.close()
-            func = modify_components_hpp(synthed_c[0].replace(".cpp", ""), synthed)
+            func = modify_components_hpp(synthed_c[min_length_sc_idx].replace(".cpp", ""), synthed)
             modify_components_cpp(func)
         
         # recompile synth_engine
@@ -254,4 +323,8 @@ if __name__ == "__main__":
                 remove(abspath(fp))
             except:
                 print("Could not remove", fp)
+        try:
+            remove(abspath(join(CURRENT_WORKING_DIRECTORY, SMT_FILE_NAME)))
+        except:
+            print("Count not remove", SMT_FILE_NAME)
 
