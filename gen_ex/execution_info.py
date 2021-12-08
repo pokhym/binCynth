@@ -3,6 +3,7 @@ from triton import MemoryAccess, TritonContext
 from enum import Enum
 import copy
 import hashlib
+import logging
 
 # TODO: Add more
 # String identifiers for which registers are used for input arguments
@@ -112,9 +113,9 @@ class FunctionInfo():
                     assert(i.r_regs["rbp"] - 8 in i.w_addrs.keys())
                     self.i_args.update({(i.r_regs["rbp"], -8) : i.w_addrs[i.r_regs["rbp"] - 8]})
                 else:
-                    print("[FunctionInfo] determine_number_input_arguments: Different offset from RBP detected. RBP", i.r_regs["rbp"], ", written addresses", i.w_addrs)
+                    logging.debug("[FunctionInfo] determine_number_input_arguments: Different offset from RBP detected. RBP " + str(i.r_regs["rbp"]) + ", written addresses " + str(i.w_addrs))
             elif "ebp" in i.r_regs:
-                print("[FunctionInfo] determine_number_input_arguments: EBP detected even though we are using 64bit")
+                logging.debug("[FunctionInfo] determine_number_input_arguments: EBP detected even though we are using 64bit")
                 exit(-1)
 
     def determine_output_arguments(self):
@@ -217,13 +218,11 @@ class ExecutionInfo():
 
         # for reverse ordering of call depth
         for cd in sorted(f_start.keys(), reverse=True):
-            print("cd", cd)
             # for each function at that call depth
             for idx in range(len(f_start[cd])):
                 s = f_start[cd][idx]
                 e = f_end[cd][idx]
                 assert(s[1] == e[1]) # start and end must be same call depth
-                print("se", (hex(s[0]), s[1]), (hex(e[0]), e[1]))
                 f_insns = []
                 for ii_idx in range(s[0], e[0] + 1, 1):
                     if parsed[ii_idx] == False:
@@ -234,13 +233,13 @@ class ExecutionInfo():
                     self.fi.update({s[1] : []})
                 self.fi[s[1]].append(f_info)
         
-        for k in self.fi.keys():
-            print("###", k, "###")
-            for v in self.fi[k]:
-                for ii in v.ii:
-                    print(ii.i_count, end=" : ")
-                print()
-            print("######")
+        # for k in self.fi.keys():
+        #     logging.debug("###", k, "###")
+        #     for v in self.fi[k]:
+        #         for ii in v.ii:
+        #             logging.debug(ii.i_count, end=" : ")
+        #         logging.debug()
+        #     logging.debug("######")
 
     def extract_function_input_output(self):
         """
@@ -270,11 +269,11 @@ class ExecutionInfo():
         """
         for cd in self.fi.keys():
             for fi in self.fi[cd]:
-                print(hex(fi.identifier))
+                logging.debug(hex(fi.identifier))
                 fi.determine_input_arguments()
-                print(fi.i_args)
+                logging.debug(fi.i_args)
                 fi.determine_output_arguments()
-                print(fi.o_args)
+                logging.debug(fi.o_args)
 
 
     def create_init_smt(self):

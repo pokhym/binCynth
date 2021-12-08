@@ -5,6 +5,7 @@ import subprocess
 import re
 from typing import List
 import glob
+import logging
 
 from gen_ex.execution_info import OUTPUT_REGISTERS
 
@@ -218,40 +219,39 @@ if __name__ == "__main__":
     assert(exists(abspath(COMPONENTS_HPP_PATH)))
     assert(exists(abspath(COMPONENTS_CPP_PATH)))
 
-    print("Enter path to input examples for black box target binary...")
+    logging.info("Enter path to input examples for black box target binary...")
     # /home/user/pysynth/tests/python/triton_int_only_example_1.txt
     bb_input_examples = input()
     bb_input_examples = abspath(bb_input_examples)
     assert(exists(bb_input_examples))
-    print("Enter path to black box target binary...")
+    logging.info("Enter path to black box target binary...")
     # /home/user/pysynth/tests/c/main_has_in_between
     bb_binary = input()
     bb_binary = abspath(bb_binary)
     assert(exists(bb_binary))
 
     # recompile synth_engine
-    print("Recompiling synthesis engine...")
+    logging.info("Recompiling synthesis engine...")
     chdir(abspath(SYNTH_ENGINE_FOLDER))
     ret = subprocess.run(["make"], capture_output=True)
     if ret.returncode != 0:
-        print("Failed to compile synth_engine function")
+        logging.info("Failed to compile synth_engine function")
         exit(-1)
     chdir(CURRENT_WORKING_DIRECTORY)
 
     # Call function extraction on main function input arguments and binary
-    print("Extracting functions from binary...")
-    fe = func_extraction.FunctionExtractor(bb_input_examples, bb_binary)
+    logging.info("Extracting functions from binary...")
+    fe = func_extraction.FunctionExtractor(bb_input_examples, bb_binary, False)
     # execute binary and return the list of examples as file paths
     io_file_paths = fe.run()
 
     # for each example file run synth_engine
     for iofp in io_file_paths:
         # exec
-        print("Synthesizing for ", iofp, "...")
+        logging.info("Synthesizing for ", iofp, "...")
         ret = subprocess.run([SYNTH_ENGINE_EXECUTABLE_PATH, abspath(iofp), abspath(PARTIAL_OUTPUT_PATH)], capture_output=False)
         if ret.returncode != 0:
-            print("Failed to synthesize.")
-            # print(ret.stdout)
+            logging.info("Failed to synthesize.")
             exit(-1)
         
         # obtain the synthesized cpp files
@@ -260,16 +260,16 @@ if __name__ == "__main__":
             and re.match(PARTIAL_SYNTHED_CPP, join(PARITAL_OUTPUT_FOLDER_PATH, f)) != None]
 
         # compile synthesized cpp files
-        print("Compiling syntehsized C files...")
+        logging.info("Compiling syntehsized C files...")
         for sc in synthed_c:
             ret = subprocess.run(["gcc", sc, "-o", sc.replace(".cpp", "")], capture_output=True)
             if ret.returncode != 0:
-                print("Failed to compile synthesized function")
-                print(sc)
+                logging.info("Failed to compile synthesized function")
+                logging.info(sc)
                 exit(-1)
         
         # equivalence check
-        print("Performing equivalence check of synthesized binaries...")
+        logging.info("Performing equivalence check of synthesized binaries...")
         executable_names : List[str] = []
         for sc in synthed_c:
             executable_names.append(join(CURRENT_WORKING_DIRECTORY, sc.replace(".cpp", "")))
@@ -281,13 +281,13 @@ if __name__ == "__main__":
         ret = subprocess.run(["z3", "-smt2", join(CURRENT_WORKING_DIRECTORY, SMT_FILE_NAME)], capture_output=True)
         # unsat means that both executables are equivalent
         if "unsat" not in ret.stdout.decode():
-            print("Failed equivalence check of synthesized functions")
+            logging.info("Failed equivalence check of synthesized functions")
             exit(-1)
         
 
 
         # check the lengths of functions and choose the shiorter one
-        print("Choosing shorter synthesized program...")
+        logging.info("Choosing shorter synthesized program...")
         curr_min_length = 9999999999999999999
         min_length_sc_idx = None
         for sc_idx in range(len(synthed_c)):
@@ -307,7 +307,7 @@ if __name__ == "__main__":
 
 
         # add to components.hpp and cpp
-        print("Updating components...")
+        logging.info("Updating components...")
         with open(abspath(synthed_c[min_length_sc_idx]), "r") as fd:
             synthed = []
             while True:
@@ -320,28 +320,28 @@ if __name__ == "__main__":
             modify_components_cpp(func)
         
         # recompile synth_engine
-        print("Recompiling synthesis engine...")
+        logging.info("Recompiling synthesis engine...")
         chdir(abspath(SYNTH_ENGINE_FOLDER))
         ret = subprocess.run(["make"], capture_output=True)
         if ret.returncode != 0:
-            print("Failed to compile synth_engine function")
-            print(sc)
+            logging.info("Failed to compile synth_engine function")
+            logging.info(sc)
             exit(-1)
         chdir(CURRENT_WORKING_DIRECTORY)
 
-        print("Attempting to remove temporary files from previous run...")
+        logging.info("Attempting to remove temporary files from previous run...")
         synthed_files = glob.glob("synthed_*")
         try:
             remove(abspath(iofp))
         except:
-            print("Could not remove", iofp)
+            logging.info("Could not remove", iofp)
         for fp in synthed_files:
             try:
                 remove(abspath(fp))
             except:
-                print("Could not remove", fp)
+                logging.info("Could not remove", fp)
         try:
             remove(abspath(join(CURRENT_WORKING_DIRECTORY, SMT_FILE_NAME)))
         except:
-            print("Count not remove", SMT_FILE_NAME)
+            logging.info("Count not remove", SMT_FILE_NAME)
 

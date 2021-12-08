@@ -10,12 +10,13 @@ import sys
 import os
 import re
 from execution_info import ExecutionInfo, InstructionInfo, InstructionType
+import logging
 
 # Script options
 # TARGET = "/home/user/pysynth/tests/c/empty_main"
 # TARGET = "/home/user/pysynth/tests/c/func_call"
-TARGET = "/home/user/pysynth/tests/c/main_has_in_between"
-INPUT_EXAMPLES = "/home/user/pysynth/tests/python/triton_int_only_example_1.txt"
+TARGET_TEST = "/home/user/pysynth/tests/c/main_has_in_between"
+INPUT_EXAMPLES_TEST = "/home/user/pysynth/tests/python/triton_int_only_example_1.txt"
 
 # Memory mapping
 BASE_ARGV  = 0x10000000
@@ -32,9 +33,9 @@ class FunctionExtractor:
     examples : List[str]
     next_call_site : bool # Next instruction is a call
     next_call_site_address : int # Address of the next call
-    i_count : int 
+    i_count : int
 
-    def __init__(self, path_to_input_examples : str, path_to_binary : str):
+    def __init__(self, path_to_input_examples : str, path_to_binary : str, debug : bool):
         self.path_to_input_examples = path_to_input_examples
         self.path_to_binary = path_to_binary
         self.io_examples = {}
@@ -56,11 +57,16 @@ class FunctionExtractor:
 
         self.i_count = 0 # instruction count
 
+        if debug:
+            logging.basicConfig(level=logging.DEBUG)
+        else:
+            logging.basicConfig(level=logging.INFO)
+
     def check_type(self, type_val : Tuple[str, str]):
         if type_val[0] == "int32":
             return (CPUSIZE.DWORD, int(type_val[1]))
         else:
-            print("Invalid example input type", type_val)
+            logging.info("Invalid example input type", type_val)
             exit(-1)
         
     def update_io_examples(self, input_example):
@@ -104,7 +110,7 @@ class FunctionExtractor:
         for phdr in phdrs:
             size   = phdr.physical_size
             vaddr  = phdr.virtual_address
-            print('Loading 0x%06x - 0x%06x' %(vaddr, vaddr+size))
+            logging.debug('Loading 0x%06x - 0x%06x' %(vaddr, vaddr+size))
             ctx.setConcreteMemoryAreaValue(vaddr, phdr.content)
 
         return binary
@@ -118,11 +124,8 @@ class FunctionExtractor:
                     break
                 buf = buf.replace("\n", "")
                 buf = buf.rstrip(",")
-                # print(buf)
                 buf = buf.split(",")
                 assert(len(buf) % 2 == 0)
-                # for i in range(0, len(buf), 2):
-                #     print(i, i + 1)
                 ex = []
                 for i in range(0, len(buf), 2):
                     ex.append(self.check_type((buf[i], buf[i + 1])))
@@ -137,7 +140,7 @@ class FunctionExtractor:
             if reg_in == reg:
                 return self.ctx.getConcreteRegisterValue(reg)
 
-        print("get_register_value: INVALID REGISTER", reg_in)
+        logging.info("get_register_value: INVALID REGISTER", reg_in)
         exit(-1)
 
     def get_memory_value(self, addr):
@@ -165,7 +168,7 @@ class FunctionExtractor:
                 The written and read value will be the same
                 To solve this pass the value before processing (we can check who reads/writes)
         """
-        print(instruction, "|", self.i_count)
+        logging.debug(str(instruction) +  " | " +  str(self.i_count))
         
         eip = instruction.getAddress()
         inst_type : InstructionType
@@ -183,34 +186,33 @@ class FunctionExtractor:
         r_addrs = {}
         w_addrs = {}
         smt = []
-        print("\t\tRead Registers:", end="")
+        logging.debug("\t\tRead Registers:")
         for r_reg in instruction.getReadRegisters():
             reg_name_val = (r_reg[0].getName(), self.get_register_value(r_reg[0]))
             r_regs.update({reg_name_val[0] : reg_name_val[1]})
-            print(reg_name_val[0] + "," + hex(reg_name_val[1]), end="|")
-        print()
-        print("\t\tRead Addresses:", end="")
+            logging.debug(reg_name_val[0] + "," + hex(reg_name_val[1]))
+        logging.debug("")
+        logging.debug("\t\tRead Addresses:", end="")
         for r_addr in instruction.getLoadAccess():
             addr_val = (r_addr[0].getAddress(), self.get_memory_value(r_addr[0]))
             r_addrs.update({addr_val[0] : addr_val[1]})
-            print(hex(addr_val[0]) + "," + hex(addr_val[1][1]), end="|")
-        print()
-        print("\t\tWritten Registers:", end="")
+            logging.debug(hex(addr_val[0]) + "," + hex(addr_val[1][1]))
+        logging.debug("")
+        logging.debug("\t\tWritten Registers:")
         for w_reg in instruction.getWrittenRegisters():
             reg_name_val = (w_reg[0].getName(), self.get_register_value(w_reg[0]))
             w_regs.update({reg_name_val[0] : reg_name_val[1]})
-            print(reg_name_val[0] + "," + hex(reg_name_val[1]), end="|")
-        print()
-        print("\t\tWritten Addresses:", end="")
+            logging.debug(reg_name_val[0] + "," + hex(reg_name_val[1]))
+        logging.debug("")
+        logging.debug("\t\tWritten Addresses:")
         for w_addr in instruction.getStoreAccess():
             addr_val = (w_addr[0].getAddress(), self.get_memory_value(w_addr[0]))
             w_addrs.update({addr_val[0] : addr_val[1]})
-            print(hex(addr_val[0]) + "," + hex(addr_val[1][1]), end="|")
-        print()
+            logging.debug(hex(addr_val[0]) + "," + hex(addr_val[1][1]))
+        logging.debug("")
 
         for expression in instruction.getSymbolicExpressions():
             smt.append((expression.getOrigin(), expression))
-            # print(expression.getOrigin())
         
         # special case for the main, where it is the call site at the current address
         if self.i_count == 0:
@@ -232,11 +234,11 @@ class FunctionExtractor:
             assert(len(call_operands) == 1)
             self.next_call_site = True
             self.next_call_site_address = call_operands[0].getValue()
-            print("########### CALL ###########")
+            logging.debug("########### CALL ###########")
         elif "ret" in str(instruction):
             self.next_call_site = False
             self.next_call_site_address = None
-            print("########### RET ###########")
+            logging.debug("########### RET ###########")
         else:
             self.next_call_site = False
             self.next_call_site_address = None
@@ -267,7 +269,6 @@ class FunctionExtractor:
             # Process
             ctx.processing(instruction)
             # dump_instruction_accesses(instruction)
-            # print(instruction)
 
             if instruction.getType() == OPCODE.X86.HLT:
                 break
@@ -316,7 +317,7 @@ class FunctionExtractor:
                 sub rsp, X      ; X is the space on the stack for local variables
         """
         rbp_main, rsp_main_sub, rsp_main = self.determine_stack_size()
-        print(hex(rbp_main), hex(rsp_main_sub), hex(rsp_main))
+        logging.debug("rbp_main: " + hex(rbp_main) + ", rsp_main_sub: " + hex(rsp_main_sub) + ", rsp_main: " + hex(rsp_main))
         curr_offset = 0
         for arg_idx in range(len(input_example) - 1, -1, -1):
             arg = input_example[arg_idx]
@@ -326,7 +327,7 @@ class FunctionExtractor:
             else:
                 exit(-1)
             mem = MemoryAccess(rbp_main - curr_offset - size, size)
-            print("Modifying:", hex(rbp_main - curr_offset - size), "with", arg[1])
+            logging.debug("Modifying: " +  hex(rbp_main - curr_offset - size) + " with " + str(arg[1]))
             self.ctx.setConcreteMemoryValue(mem, arg[1])
             # update offset to stack
             curr_offset += size
@@ -344,16 +345,16 @@ class FunctionExtractor:
 
 
         # Let's emulate the binary from the entry point
-        print('Starting emulation')
+        logging.info('Starting emulation')
         self.emulate(binary.get_symbol('main').value)
-        print('Emulation done')
+        logging.info('Emulation done')
 
-        print("Processing ExecutionInfo...")
-        print("Splitting functions...")
+        logging.info("Processing ExecutionInfo...")
+        logging.info("Splitting functions...")
         self.execution_info.split_function()
-        print("Processing function input/output per function...")
+        logging.info("Processing function input/output per function...")
         self.execution_info.extract_function_input_output()
-        print("Updating final IO examples...")
+        logging.info("Updating final IO examples...")
         self.update_io_examples(input_example)
 
     # Emulate the binary.
@@ -430,13 +431,13 @@ class FunctionExtractor:
         examples = self.parse_examples()
         for ex in examples:
             self.run_triton(ex)
-        for func_hash_id, io in self.io_examples.items():
-            print(func_hash_id)
-            print("\t", io.i_args)
-            print("\t", io.o_args)
-            print()
+        # for func_hash_id, io in self.io_examples.items():
+        #     print(func_hash_id)
+        #     print("\t", io.i_args)
+        #     print("\t", io.o_args)
+        #     print()
         return self.flatten_final_io()
 
 if __name__ == "__main__":
-    fe = FunctionExtractor(INPUT_EXAMPLES, TARGET)
+    fe = FunctionExtractor(INPUT_EXAMPLES_TEST, TARGET_TEST)
     print(fe.run())

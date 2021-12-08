@@ -3,10 +3,14 @@ import sys
 from typing import Dict, List, Tuple, final
 sys.path.insert(0, "/usr/lib/python3.8/site-packages")
 import subprocess
+import logging
 
 from triton     import TritonContext, ARCH, Instruction, MemoryAccess, CPUSIZE, OPCODE, MODE
 
 import re
+
+# info only
+logging.basicConfig(level=logging.INFO)
 
 def load_binary(ctx, prog_path):
     import lief
@@ -17,7 +21,7 @@ def load_binary(ctx, prog_path):
     for phdr in phdrs:
         size   = phdr.physical_size
         vaddr  = phdr.virtual_address
-        # print('Loading 0x%06x - 0x%06x' %(vaddr, vaddr+size))
+        logging.debug('Loading 0x%06x - 0x%06x' %(vaddr, vaddr+size))
         ctx.setConcreteMemoryAreaValue(vaddr, phdr.content)
 
     return binary
@@ -39,11 +43,11 @@ def emulate(ctx, pc, prog_id):
         ctx.processing(instruction)
 
         # Display instruction
-        print(instruction)
+        logging.debug(instruction)
 
         # Display symbolic expressions
         for expr in instruction.getSymbolicExpressions():
-            print('\t', expr)
+            logging.debug('\t' + str(expr))
             expr = str(expr).replace("ref!", "_" + str(prog_id) + "_" + "ref!")
             expr = expr.replace("SymVar", "_" + str(prog_id) + "_" + "SymVar")
             sym_exp.append(expr)
@@ -71,19 +75,19 @@ def display_info(ctx, prog_id : int):
     memory_dict : Dict[int : str]= {}
     # reg_name -> ast-expr
     final_dict : Dict[str : str] = {}
-    print()
-    print('Symbolic registers information')
-    print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
+    logging.debug("")
+    logging.debug('Symbolic registers information')
+    logging.debug('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
     # (Reference ID, Original Register Enumeration)
     ref_to_reg_enum : List[Tuple[int, int]] = []
     for k, v in list(ctx.getSymbolicRegisters().items()):
-        print(v.getId(), v)
+        logging.debug(str(v.getId()) + " " + str(v))
         ref_to_reg_enum.append((v.getId(), k))
     ref_to_reg_enum.sort(key=lambda x: x[0])
     for rore in ref_to_reg_enum:
         try:
             v = ctx.getSymbolicRegisters()[rore[1]]
-            print(ctx.getRegister(rore[1]).getName(), v)
+            logging.debug(str(ctx.getRegister(rore[1]).getName()) + " " + str(v))
             reg_name = ctx.getRegister(rore[1]).getName()
             # (define-fun ref!8 () (_ BitVec 1) SymVar_8)
             def_fun = str(v)
@@ -95,25 +99,25 @@ def display_info(ctx, prog_id : int):
             #     declare_fun = "(declare-fun _" + str(prog_id) + "_" + str(v.getAst()) + " () (_ BitVec " + str(v.getAst().getBitvectorSize()) + "))"
             reg_dict.update({reg_name : def_fun})
         except:
-            print("Register: ", ctx.getRegister(rore[1]), "is not symbolized")
+            logging.info("Register: " + str(ctx.getRegister(rore[1])) + " is not symbolized")
 
-    print()
-    print('Symbolic memory information')
-    print('~~~~~~~~~~~~~~~~~~~~~~~~~~~')
+    logging.debug("")
+    logging.debug('Symbolic memory information')
+    logging.debug('~~~~~~~~~~~~~~~~~~~~~~~~~~~')
     for k, v in list(ctx.getSymbolicMemory().items()):
-        print(hex(k), v)
+        logging.debug(hex(k) + " " + str(v))
         addr = k
         def_fun = str(v)
         def_fun = def_fun.replace("SymVar", "_" + str(prog_id) + "_SymVar")
         memory_dict.update({addr : def_fun})
 
-    print()
-    print('Craft symbolic stuffs')
-    print('~~~~~~~~~~~~~~~~~~~~~')
+    logging.debug("")
+    logging.debug('Craft symbolic stuffs')
+    logging.debug('~~~~~~~~~~~~~~~~~~~~~')
     eax  = ctx.getRegisterAst(ctx.registers.eax)
     rax  = ctx.getRegisterAst(ctx.registers.rax)
-    print('Register EAX:', eax)
-    print('Register RAX:', rax)
+    logging.debug('Register EAX:' + str(eax))
+    logging.debug('Register RAX: ' + str(rax))
     # (define-fun _0_final_eax () (_ BitVec 32))
     eax_def_fun = "(define-fun _" + str(prog_id) + "_final_eax () (_ BitVec 32)" + str(eax) + ")"
     eax_def_fun.replace("ref!", "_" + str(prog_id) + "_" + "ref!")
@@ -143,9 +147,9 @@ def symbolize_memory(ctx, prog_id):
         mem = MemoryAccess(ctx.getConcreteRegisterValue(ctx.getRegister('rbp')) - i * CPUSIZE.DWORD, CPUSIZE.DWORD)
         a = ctx.symbolizeMemory(mem)
         identifier = ctx.getSymbolicExpression(a.getId())
-        print(ctx.getMemoryAst(mem))
-        print(a)
-        print()
+        logging.debug(str(ctx.getMemoryAst(mem)))
+        logging.debug(str(a))
+        logging.debug("")
         declare_fun = "(declare-fun _" + str(prog_id) + "_" + str(a.getName()) + " () (_ BitVec " + str(a.getBitSize()) + "))"
         sym_var_mem.append(declare_fun)
         def_fun = str(ctx.getSymbolicExpression(a.getId()))
