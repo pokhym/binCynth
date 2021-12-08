@@ -1,4 +1,4 @@
-all: equivalent1_1 equivalent1_2 equivalent2_1 equivalent2_2 different1_1 different1_2 different2_1 different2_2 main_has_in_between func_call eval1 eval2 eval3
+all: equivalent1_1 equivalent1_2 equivalent2_1 equivalent2_2 different1_1 different1_2 different2_1 different2_2 main_has_in_between func_call eval1 eval2
 
 equivalent1_1:
 	gcc equivalent1_1.c -o equivalent1_1
@@ -36,8 +36,5 @@ eval1:
 eval2:
 	gcc eval2.c -o eval2
 
-eval3:
-	gcc eval3.c -o eval3
-
 clean:
-	rm equivalent1_1 equivalent1_2 equivalent2_1 equivalent2_2 different1_1 different1_2 different2_1 different2_2 main_has_in_between func_call eval1 eval2 eval3
+	rm equivalent1_1 equivalent1_2 equivalent2_1 equivalent2_2 different1_1 different1_2 different2_1 different2_2 main_has_in_between func_call eval1 eval2

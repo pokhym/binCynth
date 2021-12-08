@@ -446,7 +446,7 @@ bool SynthState::execute(std::vector<std::map<int, uint64_t> *> * examples){
                     if(FUNC_PTR_TYPE_CAST[this->function_choice[func_idx]] == e_func_ptr_o_int_i_int){
                         // std::cout<< io->at(this->perm[func_idx][0]) << std::endl;
                         // std::cout << io->at(this->perm[func_idx][1]) << std::endl;
-                        ret = ((func_ptr_o_int_i_int)(*(FUNCS[this->function_choice[func_idx]])))(io->at(this->perm[func_idx][0]));
+                        ret = ((func_ptr_o_int_i_int)(*(FUNCS[this->function_choice[func_idx]])))((int)io->at(this->perm[func_idx][0]));
 #ifdef SYNTH_STATE_DEBUG
                         std::cout << "\tcase 1: " << this->function_choice[func_idx] << " " << this->perm[func_idx][0] << ":" << (int) io->at(this->perm[func_idx][0]) << std::endl;
 #endif
@@ -475,7 +475,7 @@ bool SynthState::execute(std::vector<std::map<int, uint64_t> *> * examples){
                     uint64_t ret = 0;
                     // execute the component
                     if(FUNC_PTR_TYPE_CAST[this->function_choice[func_idx]] == e_func_ptr_o_int_i_int_i_int){
-                        ret = ((func_ptr_o_int_i_int_i_int)(*(FUNCS[this->function_choice[func_idx]])))(io->at(this->perm[func_idx][0]), io->at(this->perm[func_idx][1]));
+                        ret = ((func_ptr_o_int_i_int_i_int)(*(FUNCS[this->function_choice[func_idx]])))((int)io->at(this->perm[func_idx][0]), (int)io->at(this->perm[func_idx][1]));
 #ifdef SYNTH_STATE_DEBUG
                         std::cout << "\tcase 2: " << this->function_choice[func_idx] << " " << this->perm[func_idx][0] << ":" << (int)io->at(this->perm[func_idx][0]) << " " << this->perm[func_idx][1] << ":"  << (int)io->at(this->perm[func_idx][1]) << std::endl;
 #endif
@@ -512,6 +512,7 @@ bool SynthState::execute(std::vector<std::map<int, uint64_t> *> * examples){
         std::cout << "\tio->at(num_funcs - 1) != out: " << (io->at(num_funcs - 1) != out) << std::endl; 
 #endif
         // not all io examples matched
+        // TODO: THIS IS A TYPECAST!!! !FIX
         if(io->at(num_funcs - 1) != out){
             delete io;
             return false;
