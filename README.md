@@ -1,61 +1,118 @@
 # pysynth
-Recovering semantics of black box programs
 
-## Symbolic Execution Ideas
+Synthesizing black boxed library functions via symbolic execution and component based synthesis.
+This has been tested on Ubuntu 20.04 LTS.
 
-### Triton
+## What This Tool Provides
 
-https://github.com/JonathanSalwan/Triton
+In this project we provide a tool which synthesizes functions which can be called from a binary blob.
 
-Must be compiled with the newest version of capstone https://github.com/aquynh/capstone found here.
+It takes the following input
 
-This allows us to symbolically analyze the binaries and print the constraint that was generated when executing the binary.
+1. A binary
+2. Input examples for a specific library function call
+3. A wrapper to call our library function
 
-For example executing this example https://github.com/JonathanSalwan/Triton/blob/master/src/examples/cpp/constraint.cpp which contins one XOR instruction we can see the following constraint returned.
+And produces the following output
+
+1. Synthesized C functions in the form of SSA components
+
+## An Example
+
+Suppose we wish to synthesize the following C function `modify_stuff`, it also uses another function `modify_stuff2` which the user is unaware of.
+
+```C
+int modify_stuff2(int a){
+    return a + 1;
+}
+int modify_stuff(int a, int b){
+    a = modify_stuff2(a);
+    return 2 * modify_stuff2(a) + b;
+}
+```
+
+The user will then generate input output examples by calling `modify_stuff` on their own.
+The user is assumed to know the input types and return types of the library function `modify_stuff`
+An example text file will look like the following.
 
 ```
-RAX expr: (bvxor SymVar_0 (_ bv287454020 64))
-constraint: (= (bvxor SymVar_0 (_ bv287454020 64)) (_ bv0 64))
-Model:
-  - Variable id  : 0
-  - Variable name: SymVar_0
-  - Value        : 11223344
+int32,52,int32,86,
+int32,27,int32,95,
+int32,3,int32,21,
+...
 ```
 
-Therefore we should be able to obtain the semantics of the binary this way.
+This is a CSV where all even columns represent the input type, and the odd columns will represent the value.
 
-The flow of using Triton can be as follows
+After that the user will write an additional wrapper function for our synthesis engine to analyze.
+The input variables to the library call do not need to be initialized our tool will do that for the user during analysis.
 
-1. Compile a C program into a binary
-2. Use Triton to extract the constraint
-3. Build new function with these constraints using component based synthesis
+```C
+#include "modify_stuff.h"
+int main(){
+  int a;
+  int b;
+  return modify_stuff(a, b);
+}
+```
 
-### angr
+After compiling this wrapper, run `main.py`.
+It will prompt the user for the location of the examples, and the binary to analyze.
+Synthesized functions will be placed in `synth_engine/components.cpp`.
 
-Angr allows one to initialize variables of specific types and then add constraints and evaluate and solve the constraint
+```C
+int synthed_4(int in_1){
+	int out_0 = int_add(1, in_1);
+	return out_0;
+}
+int synthed_5(int in_1,int in_2){
+	int out_0 = int_add(4, in_2);
+	int out_1 = int_add(in_1, out_0);
+	int out_2 = int_add(in_1, out_1);
+	return out_2;
+}
 
-https://docs.angr.io/core-concepts/solver
+```
+## Dependencies
 
-Therefore the idea could be to
+We use the symbolic engine Triton (`https://github.com/JonathanSalwan/Triton`).
+Please follow the install instructions to install it on your system.
 
-1. Insert initializations for variables
-2. Read a program line by line and add constraints
-3. Save the state of the program as a formula by the end of the program
-4. For each test input (I) and output (O) assign the inputs to the input variables and evaluate the formula
-5. Check if the evaluated value is equivalent to O.  If it does, then this formula is equivalent to the semantics of the program
-6. Repeat for all inputs and outputs.
+Additionally, please make sure to install the newest version of Capstone (`https://github.com/aquynh/capstone`).
+The version found on package managers may be out of date (it is on Ubuntu 20.04 LTS)
 
-Not sure if angr is able to create a counter example for us to place back into the CEGIS loop
+## Files and Folders
 
-### CrossHair
+### Root
 
-https://crosshair.readthedocs.io/en/latest/index.html
+`main.py` is the wrapper to all the components of the system.
 
-Not sure how to get any symbolic equation out of it, it is able to return counterexamples though.
-It operates like Dafny where functions are provided with pre/post and those are checked.
+### equivalence
 
-### KLEE
+This folder contains files relating to the equivalence checking of 2 binaries.
 
-Pivot to using LLVM to perform the symbolic execution.
+1. `equivalence/equivalence_test.py`
 
-Use Cython to convert Python code to C and then call the C functions from a new Python function via C types?
+### gen_ex
+
+This folder contains files relating to the generation of examples from the binary we wish to synthesize functions from.
+
+1. `gen_ex/execution_info.py`: Stores the information of each function during execution
+2. `gen_ex/func_extraction.py`: Contains the FunctionExtractor class
+3. `gen_ex/io_example.py`: Contains a class representing an IO example for the binary we wish to synthesize functions from
+
+### synth_engine
+
+This folder contains the files for the `synth_engine`
+
+1. `synth_engine/component_state.cpp/hpp`: Contains the ComponentState class which stores the different permuations of a component we wish to test
+2. `synth_engine/components.cpp/hpp`: Components and constants relating to how we treat components
+3. `synth_engine/engine.cpp/hpp`: Contains the Engine class which is the synthesis engine and other functions such as example parsing.
+4. `synth_engine/main.cpp`: The main level call to the Engine
+5. `synth_engine/synth_state.cpp/hpp`: Contains the SynthState class which represents a choice of components to use.
+  This is then further used to execute the components and determine if they match the input output examples.
+
+### tests
+
+This folder contains some tests that were used in development.
+One can think of them as examples.
