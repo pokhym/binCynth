@@ -1,4 +1,4 @@
-# pysynth
+# binCynth
 
 Synthesizing black boxed library functions via symbolic execution and component based synthesis.
 This has been tested on Ubuntu 20.04 LTS.
