@@ -77,9 +77,11 @@ int synthed_5(int in_1,int in_2){
 
 We use the symbolic engine Triton (`https://github.com/JonathanSalwan/Triton`).
 Please follow the install instructions to install it on your system.
+Additionally, please make sure to install the newest version of Capstone (`https://github.com/aquynh/capstone`) which Triton depends on.
+The version found on package managers may be out of date (apt's is outdated Ubuntu 20.04 LTS)
 
-Additionally, please make sure to install the newest version of Capstone (`https://github.com/aquynh/capstone`).
-The version found on package managers may be out of date (it is on Ubuntu 20.04 LTS)
+To load binaries into Triton we also use LIEF (`https://github.com/lief-project/LIEF`).
+Please follow the install instructions to install it on your system.
 
 ## Files and Folders
 
