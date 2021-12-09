@@ -53,7 +53,7 @@ def loadBinary(cx: TritonContext, path: str): # -> (TritonContext, Int)
     #return (cx, binary.entrypoint.value)
     return (cx, binary.get_symbol('main').value)
 
-def instructionsFrom(cx: TritonContext, pc: int, fname = str): # -> [Instruction]
+def instructionsFrom(cx: TritonContext, pc: int, fname : str, prefix:str): # -> [Instruction, [sym]]
     '''
     Get the list of instructions from a binary loaded into Triton
     '''
@@ -68,6 +68,16 @@ def instructionsFrom(cx: TritonContext, pc: int, fname = str): # -> [Instruction
         instruction = Instruction()
         instruction.setAddress(pc)
         instruction.setOpcode(opcode)
+        
+        if completed == 3:
+            rbp = cx.getRegister("rbp")
+            rbpVal = cx.getConcreteRegisterValue(rbp)
+            memArg1 = MemoryAccess(rbpVal - CPUSIZE.DWORD, CPUSIZE.DWORD)
+            memArg1Sym = cx.symbolizeMemory(memArg1, f"{prefix}_{memArg1}_{CPUSIZE.DWORD}")
+            #print("###", memArg1Sym, cx.getSymbolicExpression(memArg1Sym.getId()))
+            memArg2 = MemoryAccess(rbpVal - CPUSIZE.DWORD * 2, CPUSIZE.DWORD)
+            memArg2Sym = cx.symbolizeMemory(memArg1, f"{prefix}_{memArg2}_{2 * CPUSIZE.DWORD}")
+            #print("###", memArg2Sym, memArg2Sym.getName(),cx.getSymbolicExpression(memArg1Sym.getId()))
 
         # Process in Triton -- Needed to update pc
         cx.processing(instruction)
@@ -123,7 +133,7 @@ def toZ3(fname: str, bname: str, prefix: str): # -> (List[str], str, sym)
     cx, pc = loadBinary(freshCx(prefix), bname)
 
     # Get the instructions and the symbolic memory for the args
-    instructions = instructionsFrom(cx, pc, fname)
+    instructions = instructionsFrom(cx, pc, fname, prefix)
 
     # Get the Z3 definitions from instructions
     z3Defs = []
@@ -131,6 +141,7 @@ def toZ3(fname: str, bname: str, prefix: str): # -> (List[str], str, sym)
     arg1Sym = "!!!"
     arg2Sym = "!!!"
     functionCalled = False
+    refNum = -1
     for inst in instructions:
         # Check if the first function call has occurred
         if not functionCalled and isSubstring(str(inst), "call"):
@@ -140,6 +151,14 @@ def toZ3(fname: str, bname: str, prefix: str): # -> (List[str], str, sym)
         for expression in inst.getSymbolicExpressions():
             z3Def, sym = prefixZ3Def(prefix, str(expression))
             z3Defs.append(z3Def)
+            symRefNum = int(sym[9:])
+
+            if refNum == -1:
+                refNum = symRefNum
+            assert refNum <= symRefNum
+            while refNum < symRefNum:
+                z3Defs.append(f"(declare-fun {prefix}_ref!{refNum} () (_ BitVec 8))")
+                refNum += 1
 
             # If the expression's origin has eax in it
             origin = expression.getOrigin()
@@ -156,6 +175,8 @@ def toZ3(fname: str, bname: str, prefix: str): # -> (List[str], str, sym)
             if not functionCalled and expressionIsMovForReg(expression, "esi"):
                 arg2Sym = f"{prefix}_arg2"
                 z3Defs.append(f"(define-fun {arg2Sym} () (_ BitVec 64) {sym})")
+
+            refNum += 1
 
     # If the function doesn't have anything associated with the rax register
     if raxSym == "!!!":
@@ -205,4 +226,3 @@ if __name__ == "__main__":
     xs = areEquivalentZ3(file1, 1, file2, 1)
     for x in xs:
         print(x)
-

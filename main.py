@@ -258,15 +258,23 @@ if __name__ == "__main__":
 
     # Call function extraction on main function input arguments and binary
     logging.info("Extracting functions from binary...")
+    t0_function_extraction = time.perf_counter()
     fe = func_extraction.FunctionExtractor(bb_input_examples, bb_binary, False)
     # execute binary and return the list of examples as file paths
     io_file_paths = fe.run()
+    t1_function_extraction = time.perf_counter()
 
     # for each example file run synth_engine
+    t0_function_synthesis = []
+    t1_function_synthesis = []
+    t0_synthesized_equivalence = []
+    t1_synthesized_equivalence = []
     for iofp in io_file_paths:
         # exec
         logging.info("Synthesizing for " + iofp + "...")
+        t0_function_synthesis.append(time.perf_counter())
         ret = subprocess.run([SYNTH_ENGINE_EXECUTABLE_PATH, abspath(iofp), abspath(PARTIAL_OUTPUT_PATH)], capture_output=False)
+        t1_function_synthesis.append(time.perf_counter())
         if ret.returncode != 0:
             logging.info("Failed to synthesize.")
             exit(-1)
@@ -293,10 +301,12 @@ if __name__ == "__main__":
             executable_names.append(join(CURRENT_WORKING_DIRECTORY, sc.replace(".cpp", "")))
         assert(len(executable_names) == 2)
         # Create SMT2 file for 
+        t0_synthesized_equivalence.append(time.perf_counter())
         equivalence_test.equivalence_check_run(executable_names[0], executable_names[1], join(CURRENT_WORKING_DIRECTORY, SMT_FILE_NAME))
         assert(exists(join(CURRENT_WORKING_DIRECTORY, SMT_FILE_NAME)))
         # check equivalence by calling z3
         ret = subprocess.run(["z3", "-smt2", join(CURRENT_WORKING_DIRECTORY, SMT_FILE_NAME)], capture_output=True)
+        t1_synthesized_equivalence.append(time.perf_counter())
         # unsat means that both executables are equivalent
         if "unsat" not in ret.stdout.decode():
             logging.info("Failed equivalence check of synthesized functions")
@@ -364,3 +374,10 @@ if __name__ == "__main__":
         except:
             logging.info("Count not remove", SMT_FILE_NAME)
 
+    logging.info("Function Extraction Took: " + str(t1_function_extraction - t0_function_extraction) + " sec")
+    logging.info("Function Synthesis Took:")
+    for t0, t1 in zip(t0_function_synthesis, t1_function_synthesis):
+        logging.info("\t" + str(t1 - t0) + " sec")
+    logging.info("Function Equivalence Took:")
+    for t0, t1 in zip(t0_synthesized_equivalence, t1_synthesized_equivalence):
+        logging.info("\t" + str(t1 - t0) + " sec")

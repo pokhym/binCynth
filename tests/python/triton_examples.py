@@ -42,9 +42,13 @@ def create_int_only(idx : int, num_input : int):
             for j in range(num_input):
                 fd.write(INT32_IDENTIFIER + TYPE_SEP + str(random.randint(INT_MIN,INT_MAX)) + ARG_SEP)
             fd.write("\n")
+            a = random.randint(INT_MIN, INT_MAX)
+            for j in range(num_input):
+                fd.write(INT32_IDENTIFIER + TYPE_SEP + str(a) + ARG_SEP)
+            fd.write("\n")
         fd.close()
 
-# create_int_only(1, 2)
+create_int_only(2, 2)
 
 # i1 = 52
 # i2 = 86

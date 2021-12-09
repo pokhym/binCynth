@@ -1,3 +1,5 @@
+import sys
+sys.path.append("/usr/lib/python3.8/site-packages")
 from typing import Dict, List, Tuple, Union
 from triton import MemoryAccess, TritonContext
 from enum import Enum
